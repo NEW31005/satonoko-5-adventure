@@ -1,0 +1,8 @@
+node_modules/
+dist/
+vite.stdout.log
+vite.stderr.log
+chrome-icons-check/
+chrome-icons-check-2/
+icons-check.png
+icons-check-2.png
