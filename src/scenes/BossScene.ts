@@ -712,7 +712,7 @@ export class BossScene extends Phaser.Scene {
     this.uiFx.lineStyle(3, 0x8b4de8, 0.95);
     this.uiFx.strokeRoundedRect(220, 18, 520, 26, 13);
 
-    const abilityBoxWidth = Phaser.Math.Clamp(this.abilityText.width + 24, 190, 390);
+    const abilityBoxWidth = Phaser.Math.Clamp(this.abilityText.width + 30, 150, 340);
     this.uiFx.fillStyle(0xffffff, 0.86);
     this.uiFx.fillRoundedRect(18, 101, abilityBoxWidth, 36, 10);
     this.uiFx.lineStyle(3, config.color, 0.95);

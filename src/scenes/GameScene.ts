@@ -466,9 +466,9 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.stageTitleText = this.add
-      .text(480, 72, "", {
+      .text(536, 72, "", {
         fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
-        fontSize: "17px",
+        fontSize: "16px",
         fontStyle: "900",
         color: "#3d332a",
         align: "center",
@@ -1017,7 +1017,7 @@ export class GameScene extends Phaser.Scene {
     this.drawTopHud(config.color);
     this.drawHeartHud(heartHudX, 42);
 
-    const abilityBoxWidth = Phaser.Math.Clamp(this.abilityText.width + 24, 190, 360);
+    const abilityBoxWidth = Phaser.Math.Clamp(this.abilityText.width + 30, 150, 340);
     this.uiFx.fillStyle(0xffffff, 0.86);
     this.uiFx.fillRoundedRect(18, 101, abilityBoxWidth, 36, 10);
     this.uiFx.lineStyle(3, config.color, 0.95);
@@ -1055,13 +1055,13 @@ export class GameScene extends Phaser.Scene {
     this.uiFx.fillRoundedRect(18, 16, 10, 52, 8);
 
     this.uiFx.fillStyle(0x2f3a45, 0.14);
-    this.uiFx.fillRoundedRect(354, 72, 252, 34, 13);
+    this.uiFx.fillRoundedRect(424, 72, 232, 32, 12);
     this.uiFx.fillStyle(0xffffff, 0.88);
-    this.uiFx.fillRoundedRect(350, 66, 252, 34, 13);
+    this.uiFx.fillRoundedRect(420, 66, 232, 32, 12);
     this.uiFx.lineStyle(2, 0x7bc9e8, 0.85);
-    this.uiFx.strokeRoundedRect(350, 66, 252, 34, 13);
+    this.uiFx.strokeRoundedRect(420, 66, 232, 32, 12);
     this.uiFx.fillStyle(0x7bc9e8, 0.22);
-    this.uiFx.fillRoundedRect(362, 74, 228, 18, 9);
+    this.uiFx.fillRoundedRect(432, 74, 208, 16, 8);
   }
 
   private drawHeartHud(x: number, y: number): void {
