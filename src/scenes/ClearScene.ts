@@ -5,20 +5,30 @@ export class ClearScene extends Phaser.Scene {
     super("ClearScene");
   }
 
-  create(data: { score?: number; stars?: number }): void {
+  create(data: { score?: number; stars?: number; round?: number; totalRounds?: number }): void {
     this.cameras.main.setBackgroundColor("#fffaf0");
 
     const score = data.score ?? 0;
     const stars = data.stars ?? 0;
+    const totalRounds = data.totalRounds ?? 5;
 
     this.add
-      .text(480, 86, "ステージクリア！", {
+      .text(480, 86, "全ラウンドクリア！", {
         fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
         fontSize: "48px",
         fontStyle: "900",
         color: "#4a2a10",
         stroke: "#ffffff",
         strokeThickness: 8,
+      })
+      .setOrigin(0.5);
+
+    this.add
+      .text(480, 136, `ラウンド ${totalRounds} までクリア`, {
+        fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
+        fontSize: "22px",
+        fontStyle: "700",
+        color: "#5d6470",
       })
       .setOrigin(0.5);
 
@@ -43,8 +53,10 @@ export class ClearScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    this.input.keyboard?.once("keydown-SPACE", () => {
-      this.scene.start("GameScene");
-    });
+    const restart = () => {
+      this.scene.start("GameScene", { roundIndex: 0, score: 0, stars: 0 });
+    };
+    this.input.keyboard?.once("keydown-SPACE", restart);
+    this.input.once("pointerdown", restart);
   }
 }

@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { characterOrder, characters, CharacterId } from "../data/characters";
-import { levelData, RectSpec } from "../data/levelData";
+import { levelData, RectSpec, roundCount, RoundData, rounds } from "../data/levelData";
 import { Dinosaur } from "../objects/Dinosaur";
 import { Enemy } from "../objects/Enemy";
 import { Player } from "../objects/Player";
@@ -42,6 +42,10 @@ export class GameScene extends Phaser.Scene {
   private abilityText!: Phaser.GameObjects.Text;
   private topIconImages: Phaser.GameObjects.Image[] = [];
   private selectIconImages: Phaser.GameObjects.Image[] = [];
+  private level: RoundData = levelData;
+  private currentRoundIndex = 0;
+  private roundStartScore = 0;
+  private roundStartStars = 0;
   private characterIndex = 0;
   private score = 0;
   private starsCollected = 0;
@@ -68,12 +72,19 @@ export class GameScene extends Phaser.Scene {
     super("GameScene");
   }
 
+  init(data?: { roundIndex?: number; score?: number; stars?: number }): void {
+    this.currentRoundIndex = Phaser.Math.Clamp(data?.roundIndex ?? 0, 0, roundCount - 1);
+    this.level = rounds[this.currentRoundIndex] ?? rounds[0];
+    this.roundStartScore = data?.score ?? 0;
+    this.roundStartStars = data?.stars ?? 0;
+  }
+
   create(): void {
     this.characterIndex = 0;
-    this.score = 0;
-    this.starsCollected = 0;
+    this.score = this.roundStartScore;
+    this.starsCollected = this.roundStartStars;
     this.hp = 3;
-    this.checkpoint = { ...levelData.checkpoint };
+    this.checkpoint = { ...this.level.checkpoint };
     this.damageLockUntil = 0;
     this.dashUntil = 0;
     this.flightUntil = 0;
@@ -91,8 +102,8 @@ export class GameScene extends Phaser.Scene {
       jumpQueued: false,
     };
 
-    this.physics.world.setBounds(0, 0, levelData.worldWidth, levelData.worldHeight);
-    this.cameras.main.setBounds(0, 0, levelData.worldWidth, 540);
+    this.physics.world.setBounds(0, 0, this.level.worldWidth, this.level.worldHeight);
+    this.cameras.main.setBounds(0, 0, this.level.worldWidth, 540);
     this.createGeneratedTextures();
     this.createSpriteAnimations();
     this.addBackground();
@@ -114,7 +125,7 @@ export class GameScene extends Phaser.Scene {
     this.createEnemies();
     this.createGoal();
 
-    this.player = new Player(this, levelData.start.x, levelData.start.y);
+    this.player = new Player(this, this.level.start.x, this.level.start.y);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12, 0, 70);
 
     this.physics.add.collider(this.player, this.platforms);
@@ -173,6 +184,7 @@ export class GameScene extends Phaser.Scene {
 
     this.createUi();
     this.createTouchControls();
+    this.showRoundIntro();
   }
 
   update(time: number): void {
@@ -181,7 +193,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.controls.r)) {
-      this.scene.restart();
+      this.restartRound();
       return;
     }
 
@@ -323,7 +335,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createPlatforms(): void {
-    levelData.platforms.forEach((platform) => this.addPlatform(platform));
+    this.level.platforms.forEach((platform) => this.addPlatform(platform));
   }
 
   private addPlatform({ x, y, width, height }: RectSpec): void {
@@ -337,7 +349,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createCollectibles(): void {
-    levelData.stars.forEach(({ x, y }) => {
+    this.level.stars.forEach(({ x, y }) => {
       const star = this.stars.create(x, y, "star") as Phaser.Physics.Arcade.Sprite;
       star.setDisplaySize(30, 30);
       star.setDepth(9);
@@ -352,7 +364,7 @@ export class GameScene extends Phaser.Scene {
       });
     });
 
-    levelData.hearts.forEach(({ x, y }) => {
+    this.level.hearts.forEach(({ x, y }) => {
       const heart = this.hearts.create(x, y, "heart") as Phaser.Physics.Arcade.Sprite;
       heart.setDisplaySize(32, 32);
       heart.setDepth(9);
@@ -361,7 +373,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createHazards(): void {
-    levelData.spikes.forEach((spike) => {
+    this.level.spikes.forEach((spike) => {
       const zone = this.add.zone(spike.x + spike.width / 2, spike.y + spike.height / 2, spike.width, spike.height);
       this.physics.add.existing(zone, true);
       this.hazards.add(zone);
@@ -380,7 +392,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createLocks(): void {
-    levelData.dashWalls.forEach((wall) => {
+    this.level.dashWalls.forEach((wall) => {
       const block = this.add.rectangle(wall.x + wall.width / 2, wall.y + wall.height / 2, wall.width, wall.height, 0xb282ff);
       block.setStrokeStyle(4, 0xffffff, 1);
       block.setData("kind", "dashWall");
@@ -388,7 +400,7 @@ export class GameScene extends Phaser.Scene {
       this.dashWalls.add(block);
     });
 
-    levelData.rocks.forEach((rock) => {
+    this.level.rocks.forEach((rock) => {
       const block = this.add.rectangle(rock.x + rock.width / 2, rock.y + rock.height / 2, rock.width, rock.height, 0x9d7150);
       block.setStrokeStyle(4, 0x6d472f, 1);
       block.setData("kind", "rock");
@@ -402,13 +414,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createEnemies(): void {
-    levelData.enemies.forEach((enemy) => {
+    this.level.enemies.forEach((enemy) => {
       this.enemies.add(new Enemy(this, enemy.x, enemy.y, enemy.minX, enemy.maxX));
     });
   }
 
   private createGoal(): void {
-    const { x, y, width, height } = levelData.goal;
+    const { x, y, width, height } = this.level.goal;
     const pole = this.add.rectangle(x + width / 2, y + height / 2, 10, height, 0x6b4b2b).setDepth(4);
     const flag = this.add.triangle(x + 42, y + 34, 0, 0, 74, 24, 0, 48, 0xffd84d).setDepth(5);
     flag.setStrokeStyle(3, 0xffffff, 1);
@@ -475,6 +487,32 @@ export class GameScene extends Phaser.Scene {
     }, 78, "12px");
 
     this.addMovePad(820, 488);
+  }
+
+  private showRoundIntro(): void {
+    const text = this.add
+      .text(480, 164, `ラウンド ${this.level.round}\n${this.level.title}`, {
+        fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
+        fontSize: "34px",
+        fontStyle: "900",
+        color: "#4a2a10",
+        align: "center",
+        stroke: "#ffffff",
+        strokeThickness: 8,
+      })
+      .setOrigin(0.5)
+      .setDepth(315)
+      .setScrollFactor(0);
+
+    this.tweens.add({
+      targets: text,
+      y: 136,
+      alpha: 0,
+      delay: 900,
+      duration: 650,
+      ease: "Quad.easeIn",
+      onComplete: () => text.destroy(),
+    });
   }
 
   private createCharacterIconButtons(): void {
@@ -842,13 +880,38 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateCheckpoint(): void {
-    if (this.player.x > 3060) {
-      this.checkpoint = { x: 3060, y: 420 };
-    } else if (this.player.x > 2180) {
-      this.checkpoint = { x: 2180, y: 420 };
-    } else if (this.player.x > 1420) {
-      this.checkpoint = { x: 1420, y: 420 };
+    this.level.checkpoints.forEach((checkpoint) => {
+      if (this.player.x > checkpoint.x) {
+        this.checkpoint = { ...checkpoint };
+      }
+    });
+  }
+
+  private restartRound(): void {
+    this.scene.restart({
+      roundIndex: this.currentRoundIndex,
+      score: this.roundStartScore,
+      stars: this.roundStartStars,
+    });
+  }
+
+  private startNextRound(): void {
+    const nextRoundIndex = this.currentRoundIndex + 1;
+    if (nextRoundIndex >= roundCount) {
+      this.scene.start("ClearScene", {
+        score: this.score,
+        stars: this.starsCollected,
+        round: this.level.round,
+        totalRounds: roundCount,
+      });
+      return;
     }
+
+    this.scene.restart({
+      roundIndex: nextRoundIndex,
+      score: this.score,
+      stars: this.starsCollected,
+    });
   }
 
   private updateEffects(time: number): void {
@@ -882,7 +945,7 @@ export class GameScene extends Phaser.Scene {
   private updateUi(time: number): void {
     const config = this.player.config;
     const hpText = "♥".repeat(this.hp) + "♡".repeat(Math.max(0, 3 - this.hp));
-    this.uiText.setText(`${config.name}（${config.kana}）  ${hpText}  スコア ${this.score}`);
+    this.uiText.setText(`R${this.level.round}/${roundCount} ${config.name}（${config.kana}）  ${hpText}  スコア ${this.score}`);
 
     const cooldown = Math.max(0, ((this.cooldowns[this.player.activeId] ?? 0) - time) / 1000);
     const summon = this.player.activeId === "yuri" ? "  右へ突進" : "";
@@ -1074,11 +1137,11 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     retryButton.on("pointerdown", () => {
-      this.scene.restart();
+      this.restartRound();
     });
 
     this.input.keyboard?.once("keydown-SPACE", () => {
-      this.scene.restart();
+      this.restartRound();
     });
   }
 
@@ -1115,12 +1178,22 @@ export class GameScene extends Phaser.Scene {
 
     this.isClearing = true;
     this.player.setVelocity(0, 0);
+    const roundText = this.add
+      .text(480, 232, this.currentRoundIndex + 1 >= roundCount ? "ぜんぶクリア！" : `ラウンド${this.level.round}クリア！`, {
+        fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
+        fontSize: "36px",
+        fontStyle: "900",
+        color: "#4a2a10",
+        stroke: "#ffffff",
+        strokeThickness: 8,
+      })
+      .setOrigin(0.5)
+      .setDepth(330)
+      .setScrollFactor(0);
     this.cameras.main.fadeOut(450, 255, 255, 255);
     this.time.delayedCall(460, () => {
-      this.scene.start("ClearScene", {
-        score: this.score,
-        stars: this.starsCollected,
-      });
+      roundText.destroy();
+      this.startNextRound();
     });
   }
 
