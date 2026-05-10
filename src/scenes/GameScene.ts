@@ -38,6 +38,7 @@ export class GameScene extends Phaser.Scene {
   private worldFx!: Phaser.GameObjects.Graphics;
   private uiFx!: Phaser.GameObjects.Graphics;
   private uiText!: Phaser.GameObjects.Text;
+  private scoreText!: Phaser.GameObjects.Text;
   private stageTitleText!: Phaser.GameObjects.Text;
   private specialLabelText!: Phaser.GameObjects.Text;
   private abilityText!: Phaser.GameObjects.Text;
@@ -444,6 +445,17 @@ export class GameScene extends Phaser.Scene {
     this.selectIconImages = [];
     this.uiText = this.add
       .text(32, 27, "", {
+        fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
+        fontSize: "17px",
+        fontStyle: "900",
+        color: "#2d241f",
+      })
+      .setShadow(0, 2, "rgba(255,255,255,0.95)", 1, true, true)
+      .setDepth(101)
+      .setScrollFactor(0);
+
+    this.scoreText = this.add
+      .text(304, 27, "", {
         fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
         fontSize: "17px",
         fontStyle: "900",
@@ -992,15 +1004,16 @@ export class GameScene extends Phaser.Scene {
 
   private updateUi(time: number): void {
     const config = this.player.config;
-    const hpText = "♥".repeat(this.hp) + "♡".repeat(Math.max(0, 3 - this.hp));
-    this.uiText.setText(`R${this.level.round}/${roundCount} ${config.name}（${config.kana}）  ${hpText}  スコア ${this.score}`);
-    this.stageTitleText.setText(this.level.title);
+    this.uiText.setText(`${config.name}（${config.kana}）`);
+    this.scoreText.setText(`スコア ${this.score}`);
+    this.stageTitleText.setText(`R${this.level.round} ${this.level.title}`);
 
     this.abilityText.setText(this.getSpecialDisplayName());
     this.specialLabelText.setColor(config.uiColor);
 
     this.uiFx.clear();
     this.drawTopHud(config.color);
+    this.drawHeartHud(212, 42);
 
     const abilityBoxWidth = Phaser.Math.Clamp(this.abilityText.width + 24, 190, 360);
     this.uiFx.fillStyle(0xffffff, 0.86);
@@ -1044,13 +1057,41 @@ export class GameScene extends Phaser.Scene {
     this.uiFx.strokeCircle(388, 45, 11);
 
     this.uiFx.fillStyle(0x2f3a45, 0.14);
-    this.uiFx.fillRoundedRect(374, 72, 212, 38, 14);
+    this.uiFx.fillRoundedRect(334, 72, 292, 38, 14);
     this.uiFx.fillStyle(0xffffff, 0.88);
-    this.uiFx.fillRoundedRect(370, 66, 212, 38, 14);
+    this.uiFx.fillRoundedRect(330, 66, 292, 38, 14);
     this.uiFx.lineStyle(2, 0x7bc9e8, 0.85);
-    this.uiFx.strokeRoundedRect(370, 66, 212, 38, 14);
+    this.uiFx.strokeRoundedRect(330, 66, 292, 38, 14);
     this.uiFx.fillStyle(0x7bc9e8, 0.22);
-    this.uiFx.fillRoundedRect(380, 74, 192, 20, 10);
+    this.uiFx.fillRoundedRect(342, 74, 268, 20, 10);
+  }
+
+  private drawHeartHud(x: number, y: number): void {
+    for (let index = 0; index < 3; index += 1) {
+      const heartX = x + index * 28;
+      const filled = index < this.hp;
+      const fillColor = filled ? 0xff4d78 : 0xffffff;
+      const strokeColor = filled ? 0xd72f5f : 0xffabc0;
+
+      this.uiFx.fillStyle(0x2f3a45, 0.14);
+      this.drawHeartShape(heartX + 1, y + 2, 0x2f3a45, 0.14);
+      this.drawHeartShape(heartX, y, fillColor, filled ? 0.98 : 0.76);
+      this.uiFx.lineStyle(3, strokeColor, 0.95);
+      this.uiFx.strokeCircle(heartX - 5, y - 4, 6);
+      this.uiFx.strokeCircle(heartX + 5, y - 4, 6);
+      this.uiFx.strokeTriangle(heartX - 12, y - 1, heartX + 12, y - 1, heartX, y + 14);
+      if (filled) {
+        this.uiFx.fillStyle(0xffffff, 0.52);
+        this.uiFx.fillCircle(heartX - 4, y - 6, 3);
+      }
+    }
+  }
+
+  private drawHeartShape(x: number, y: number, color: number, alpha: number): void {
+    this.uiFx.fillStyle(color, alpha);
+    this.uiFx.fillCircle(x - 5, y - 4, 7);
+    this.uiFx.fillCircle(x + 5, y - 4, 7);
+    this.uiFx.fillTriangle(x - 13, y - 1, x + 13, y - 1, x, y + 15);
   }
 
   private getSpecialDisplayName(): string {
@@ -1137,6 +1178,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (this.time.now < this.invincibleUntil) {
+      this.popEnemy(enemy);
       return;
     }
 
