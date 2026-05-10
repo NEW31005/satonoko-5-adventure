@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { characterOrder, characters } from "../data/characters";
 
 const assetPath = `${import.meta.env.BASE_URL}assets/characters`;
+const bossAssetPath = `${import.meta.env.BASE_URL}assets/boss`;
 
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -16,6 +17,7 @@ export class TitleScene extends Phaser.Scene {
     this.load.image("shiori", `${assetPath}/shiori.png`);
     this.load.image("akari", `${assetPath}/akari.png`);
     this.load.image("chibitira", `${assetPath}/chibitira.png`);
+    this.load.image("finalBoss", `${bossAssetPath}/final_boss.png`);
     characterOrder.forEach((id) => {
       const character = characters[id];
       this.load.image(character.iconKey, `${assetPath}/icons/${id}_face.png`);

@@ -5,7 +5,7 @@ export class ClearScene extends Phaser.Scene {
     super("ClearScene");
   }
 
-  create(data: { score?: number; stars?: number; round?: number; totalRounds?: number }): void {
+  create(data: { score?: number; stars?: number; round?: number; totalRounds?: number; bossCleared?: boolean }): void {
     this.cameras.main.setBackgroundColor("#fffaf0");
 
     const score = data.score ?? 0;
@@ -13,7 +13,7 @@ export class ClearScene extends Phaser.Scene {
     const totalRounds = data.totalRounds ?? 5;
 
     this.add
-      .text(480, 86, "全ラウンドクリア！", {
+      .text(480, 86, data.bossCleared ? "ラスボス撃破！" : "全ラウンドクリア！", {
         fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
         fontSize: "48px",
         fontStyle: "900",
@@ -24,7 +24,7 @@ export class ClearScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(480, 136, `ラウンド ${totalRounds} までクリア`, {
+      .text(480, 136, data.bossCleared ? `ラウンド ${totalRounds} + ラスボスクリア` : `ラウンド ${totalRounds} までクリア`, {
         fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
         fontSize: "22px",
         fontStyle: "700",

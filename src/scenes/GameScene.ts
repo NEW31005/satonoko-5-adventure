@@ -898,11 +898,9 @@ export class GameScene extends Phaser.Scene {
   private startNextRound(): void {
     const nextRoundIndex = this.currentRoundIndex + 1;
     if (nextRoundIndex >= roundCount) {
-      this.scene.start("ClearScene", {
+      this.scene.start("BossScene", {
         score: this.score,
         stars: this.starsCollected,
-        round: this.level.round,
-        totalRounds: roundCount,
       });
       return;
     }
