@@ -11,6 +11,7 @@ export class TitleScene extends Phaser.Scene {
 
   preload(): void {
     this.load.image("lineup", `${assetPath}/lineup.png`);
+    this.load.image("lineupTitle", `${assetPath}/lineup_title.png`);
     this.load.image("inori", `${assetPath}/inori.png`);
     this.load.image("yuri", `${assetPath}/yuri.png`);
     this.load.image("matsuri", `${assetPath}/matsuri.png`);
@@ -55,7 +56,15 @@ export class TitleScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    this.add.image(480, 310, "lineup").setDisplaySize(760, 380).setAlpha(0.98);
+    this.add
+      .rectangle(480, 312, 910, 386, 0xffffff, 0.72)
+      .setStrokeStyle(2, 0xffffff, 0.85);
+    this.add
+      .image(665, 318, "finalBoss")
+      .setDisplaySize(330, 425)
+      .setAlpha(0.26)
+      .setTint(0x9b5cff);
+    this.add.image(480, 310, "lineupTitle").setDisplaySize(760, 380).setAlpha(0.98);
 
     const start = this.add
       .text(480, 490, "タップ / Space でスタート", {
