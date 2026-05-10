@@ -38,6 +38,7 @@ export class GameScene extends Phaser.Scene {
   private worldFx!: Phaser.GameObjects.Graphics;
   private uiFx!: Phaser.GameObjects.Graphics;
   private uiText!: Phaser.GameObjects.Text;
+  private specialLabelText!: Phaser.GameObjects.Text;
   private abilityText!: Phaser.GameObjects.Text;
   private topIconImages: Phaser.GameObjects.Image[] = [];
   private selectIconImages: Phaser.GameObjects.Image[] = [];
@@ -435,12 +436,21 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.abilityText = this.add
-      .text(18, 92, "", {
+      .text(30, 111, "", {
         fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
         fontSize: "15px",
+        fontStyle: "700",
+        color: "#32261f",
+      })
+      .setDepth(101)
+      .setScrollFactor(0);
+
+    this.specialLabelText = this.add
+      .text(22, 87, "SPECIAL", {
+        fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
+        fontSize: "12px",
+        fontStyle: "900",
         color: "#4b5360",
-        backgroundColor: "rgba(255,255,255,0.82)",
-        padding: { x: 14, y: 8 },
       })
       .setDepth(101)
       .setScrollFactor(0);
@@ -877,8 +887,15 @@ export class GameScene extends Phaser.Scene {
     const cooldown = Math.max(0, ((this.cooldowns[this.player.activeId] ?? 0) - time) / 1000);
     const summon = this.player.activeId === "yuri" ? "  右へ突進" : "";
     this.abilityText.setText(`${config.specialName}${summon}${cooldown > 0 ? `  あと ${cooldown.toFixed(1)}秒` : "  OK"}`);
+    this.specialLabelText.setColor(config.uiColor);
 
     this.uiFx.clear();
+    const abilityBoxWidth = Phaser.Math.Clamp(this.abilityText.width + 24, 190, 360);
+    this.uiFx.fillStyle(0xffffff, 0.86);
+    this.uiFx.fillRoundedRect(18, 101, abilityBoxWidth, 36, 10);
+    this.uiFx.lineStyle(3, config.color, 0.95);
+    this.uiFx.strokeRoundedRect(18, 101, abilityBoxWidth, 36, 10);
+
     this.uiFx.fillStyle(0xffffff, 0.8);
     this.uiFx.fillRoundedRect(668, 12, 274, 54, 14);
     characterOrder.forEach((id, index) => {
