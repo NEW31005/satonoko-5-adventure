@@ -38,6 +38,7 @@ export class GameScene extends Phaser.Scene {
   private worldFx!: Phaser.GameObjects.Graphics;
   private uiFx!: Phaser.GameObjects.Graphics;
   private uiText!: Phaser.GameObjects.Text;
+  private stageTitleText!: Phaser.GameObjects.Text;
   private specialLabelText!: Phaser.GameObjects.Text;
   private abilityText!: Phaser.GameObjects.Text;
   private topIconImages: Phaser.GameObjects.Image[] = [];
@@ -442,15 +443,27 @@ export class GameScene extends Phaser.Scene {
     this.topIconImages = [];
     this.selectIconImages = [];
     this.uiText = this.add
-      .text(18, 16, "", {
+      .text(32, 27, "", {
         fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
-        fontSize: "18px",
-        fontStyle: "700",
-        color: "#32261f",
-        backgroundColor: "rgba(255,255,255,0.82)",
-        padding: { x: 14, y: 10 },
+        fontSize: "17px",
+        fontStyle: "900",
+        color: "#2d241f",
       })
+      .setShadow(0, 2, "rgba(255,255,255,0.95)", 1, true, true)
       .setDepth(101)
+      .setScrollFactor(0);
+
+    this.stageTitleText = this.add
+      .text(480, 72, "", {
+        fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
+        fontSize: "19px",
+        fontStyle: "900",
+        color: "#3d332a",
+        align: "center",
+      })
+      .setOrigin(0.5, 0)
+      .setShadow(0, 2, "rgba(255,255,255,0.95)", 1, true, true)
+      .setDepth(102)
       .setScrollFactor(0);
 
     this.abilityText = this.add
@@ -981,11 +994,14 @@ export class GameScene extends Phaser.Scene {
     const config = this.player.config;
     const hpText = "♥".repeat(this.hp) + "♡".repeat(Math.max(0, 3 - this.hp));
     this.uiText.setText(`R${this.level.round}/${roundCount} ${config.name}（${config.kana}）  ${hpText}  スコア ${this.score}`);
+    this.stageTitleText.setText(this.level.title);
 
     this.abilityText.setText(this.getSpecialDisplayName());
     this.specialLabelText.setColor(config.uiColor);
 
     this.uiFx.clear();
+    this.drawTopHud(config.color);
+
     const abilityBoxWidth = Phaser.Math.Clamp(this.abilityText.width + 24, 190, 360);
     this.uiFx.fillStyle(0xffffff, 0.86);
     this.uiFx.fillRoundedRect(18, 101, abilityBoxWidth, 36, 10);
@@ -1011,6 +1027,30 @@ export class GameScene extends Phaser.Scene {
     this.uiFx.fillRoundedRect(736, 72, 206, 20, 10);
     this.uiFx.fillStyle(config.color, 0.9);
     this.uiFx.fillRoundedRect(740, 76, 198 * activeRatio, 12, 8);
+  }
+
+  private drawTopHud(characterColor: number): void {
+    this.uiFx.fillStyle(0x2f3a45, 0.16);
+    this.uiFx.fillRoundedRect(22, 22, 390, 52, 16);
+    this.uiFx.fillStyle(0xffffff, 0.92);
+    this.uiFx.fillRoundedRect(18, 16, 390, 52, 16);
+    this.uiFx.lineStyle(3, characterColor, 0.9);
+    this.uiFx.strokeRoundedRect(18, 16, 390, 52, 16);
+    this.uiFx.fillStyle(characterColor, 0.92);
+    this.uiFx.fillRoundedRect(18, 16, 10, 52, 8);
+    this.uiFx.fillStyle(0xffd84d, 0.9);
+    this.uiFx.fillCircle(388, 45, 11);
+    this.uiFx.lineStyle(2, 0xffffff, 0.95);
+    this.uiFx.strokeCircle(388, 45, 11);
+
+    this.uiFx.fillStyle(0x2f3a45, 0.14);
+    this.uiFx.fillRoundedRect(374, 72, 212, 38, 14);
+    this.uiFx.fillStyle(0xffffff, 0.88);
+    this.uiFx.fillRoundedRect(370, 66, 212, 38, 14);
+    this.uiFx.lineStyle(2, 0x7bc9e8, 0.85);
+    this.uiFx.strokeRoundedRect(370, 66, 212, 38, 14);
+    this.uiFx.fillStyle(0x7bc9e8, 0.22);
+    this.uiFx.fillRoundedRect(380, 74, 192, 20, 10);
   }
 
   private getSpecialDisplayName(): string {
