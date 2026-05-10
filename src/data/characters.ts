@@ -132,7 +132,7 @@ export const characters: Record<CharacterId, CharacterConfig> = {
     dinosaurName: "チビティラ",
     dinosaurSpeed: 760,
     dinosaurLifetime: 2.2,
-    specialCooldown: 2.4,
+    specialCooldown: 1.4,
     color: 0xff5a3c,
     uiColor: "#e6412d",
     assetKey: "yuri",
