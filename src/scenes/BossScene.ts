@@ -681,6 +681,10 @@ export class BossScene extends Phaser.Scene {
       return;
     }
 
+    if (this.isAkariDashActive(time)) {
+      return;
+    }
+
     if (this.isMatsuriInvincible(time)) {
       return;
     }
@@ -702,7 +706,13 @@ export class BossScene extends Phaser.Scene {
   }
 
   private updateBeamHit(time: number): void {
-    if (!this.beamRect || time >= this.beamUntil || this.player.activeId === "matsuri" || this.isMatsuriInvincible(time)) {
+    if (
+      !this.beamRect ||
+      time >= this.beamUntil ||
+      this.player.activeId === "matsuri" ||
+      this.isMatsuriInvincible(time) ||
+      this.isAkariDashActive(time)
+    ) {
       return;
     }
 
@@ -1015,7 +1025,13 @@ export class BossScene extends Phaser.Scene {
 
   private takeDamage(source?: Phaser.GameObjects.GameObject, forceRespawn = false): void {
     const now = this.time.now;
-    if (now < this.damageLockUntil || this.isMatsuriInvincible(now) || this.isGameOver || this.isEnding) {
+    if (
+      now < this.damageLockUntil ||
+      this.isMatsuriInvincible(now) ||
+      this.isAkariDashActive(now) ||
+      this.isGameOver ||
+      this.isEnding
+    ) {
       return;
     }
 
@@ -1041,6 +1057,10 @@ export class BossScene extends Phaser.Scene {
 
   private isMatsuriInvincible(time: number): boolean {
     return this.player.activeId === "matsuri" && time < this.invincibleUntil;
+  }
+
+  private isAkariDashActive(time: number): boolean {
+    return this.player.activeId === "akari" && time < this.dashUntil;
   }
 
   private getBossBodyRect(): Phaser.Geom.Rectangle {

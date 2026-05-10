@@ -88,18 +88,29 @@ export class TitleScene extends Phaser.Scene {
     this.createDifficultySelector();
 
     const start = this.add
-      .text(480, 504, "タップ / Space でスタート", {
+      .text(370, 504, "冒険スタート", {
         fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
         fontSize: "22px",
         fontStyle: "700",
         color: "#ffffff",
         backgroundColor: "#2f7ac8",
-        padding: { x: 24, y: 10 },
+        padding: { x: 28, y: 10 },
+      })
+      .setOrigin(0.5);
+
+    const bossChallenge = this.add
+      .text(620, 504, "ボスに挑む", {
+        fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
+        fontSize: "22px",
+        fontStyle: "900",
+        color: "#ffffff",
+        backgroundColor: "#8b4de8",
+        padding: { x: 28, y: 10 },
       })
       .setOrigin(0.5);
 
     this.tweens.add({
-      targets: start,
+      targets: [start, bossChallenge],
       scale: 1.04,
       duration: 620,
       yoyo: true,
@@ -110,13 +121,22 @@ export class TitleScene extends Phaser.Scene {
     const startGame = () => {
       this.scene.start("GameScene", { difficulty: this.selectedDifficultyId });
     };
+    const startBoss = () => {
+      this.scene.start("BossScene", {
+        score: 0,
+        stars: 0,
+        difficulty: this.selectedDifficultyId,
+      });
+    };
 
     this.input.keyboard?.on("keydown-A", () => this.selectAdjacentDifficulty(-1));
     this.input.keyboard?.on("keydown-S", () => this.selectAdjacentDifficulty(1));
     this.input.keyboard?.on("keydown-LEFT", () => this.selectAdjacentDifficulty(-1));
     this.input.keyboard?.on("keydown-RIGHT", () => this.selectAdjacentDifficulty(1));
+    this.input.keyboard?.once("keydown-B", startBoss);
     this.input.keyboard?.once("keydown-SPACE", startGame);
     start.setInteractive({ useHandCursor: true }).on("pointerdown", startGame);
+    bossChallenge.setInteractive({ useHandCursor: true }).on("pointerdown", startBoss);
   }
 
   private createDifficultySelector(): void {
