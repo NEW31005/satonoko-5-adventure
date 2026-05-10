@@ -50,6 +50,7 @@ export class GameScene extends Phaser.Scene {
   private dashUntil = 0;
   private flightUntil = 0;
   private invincibleUntil = 0;
+  private hazardDashFxUntil = 0;
   private cooldowns: Partial<Record<CharacterId, number>> = {};
   private isClearing = false;
   private isGameOver = false;
@@ -76,6 +77,7 @@ export class GameScene extends Phaser.Scene {
     this.dashUntil = 0;
     this.flightUntil = 0;
     this.invincibleUntil = 0;
+    this.hazardDashFxUntil = 0;
     this.cooldowns = {};
     this.isClearing = false;
     this.isGameOver = false;
@@ -133,6 +135,13 @@ export class GameScene extends Phaser.Scene {
       this.clearStage();
     });
     this.physics.add.overlap(this.player, this.hazards, () => {
+      if (this.isAkariDashActive()) {
+        if (this.time.now > this.hazardDashFxUntil) {
+          this.hazardDashFxUntil = this.time.now + 240;
+          this.spawnSpeedFlash();
+        }
+        return;
+      }
       this.takeDamage();
     });
     this.physics.add.overlap(this.player, this.enemies, (_, enemy) => {
@@ -145,6 +154,9 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.dinosaurs, this.enemies, (dino, enemy) => {
       this.popEnemy(enemy as Enemy);
       (dino as Dinosaur).destroy();
+    });
+    this.physics.add.overlap(this.dinosaurs, this.hazards, (_, hazard) => {
+      this.breakHazard(hazard as Phaser.GameObjects.GameObject);
     });
 
     this.controls = this.input.keyboard!.addKeys({
@@ -354,12 +366,15 @@ export class GameScene extends Phaser.Scene {
       this.hazards.add(zone);
 
       const count = Math.floor(spike.width / 28);
+      const visuals: Phaser.GameObjects.Triangle[] = [];
       for (let i = 0; i < count; i += 1) {
-        this.add
+        const triangle = this.add
           .triangle(spike.x + 14 + i * 28, spike.y + spike.height, 0, 28, 14, 0, 28, 28, 0xff7b67)
           .setStrokeStyle(2, 0xffffff, 0.85)
           .setDepth(8);
+        visuals.push(triangle);
       }
+      zone.setData("visuals", visuals);
     });
   }
 
@@ -486,22 +501,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private addMovePad(x: number, y: number): void {
-    const radius = 43;
-    const base = this.add
-      .circle(x, y, radius, 0x2f7ac8, 0.74)
-      .setDepth(154)
-      .setScrollFactor(0)
-      .setStrokeStyle(4, 0xffffff, 0.92);
     this.add
-      .circle(x - 13, y - 14, 10, 0xffffff, 0.2)
-      .setDepth(155)
-      .setScrollFactor(0);
-    this.add
-      .rectangle(x, y, 3, radius * 1.48, 0xffffff, 0.45)
-      .setDepth(155)
-      .setScrollFactor(0);
-    this.add
-      .text(x, y - 36, "いどう", {
+      .text(x, y - 58, "いどう", {
         fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
         fontSize: "13px",
         fontStyle: "700",
@@ -512,62 +513,66 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(156)
       .setScrollFactor(0);
-    this.add
-      .text(x - 42, y, "←", {
-        fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
-        fontSize: "30px",
-        fontStyle: "900",
-        color: "#ffffff",
-      })
-      .setOrigin(0.5)
-      .setDepth(156)
-      .setScrollFactor(0);
-    this.add
-      .text(x + 42, y, "→", {
-        fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
-        fontSize: "30px",
-        fontStyle: "900",
-        color: "#ffffff",
-      })
-      .setOrigin(0.5)
-      .setDepth(156)
-      .setScrollFactor(0);
 
-    const leftZone = this.add
-      .zone(x - radius / 2, y, radius, radius * 1.65)
-      .setDepth(160)
-      .setScrollFactor(0)
-      .setInteractive({ useHandCursor: true });
-    const rightZone = this.add
-      .zone(x + radius / 2, y, radius, radius * 1.65)
-      .setDepth(160)
-      .setScrollFactor(0)
-      .setInteractive({ useHandCursor: true });
-
-    const releaseLeft = () => {
-      this.virtualControls.left = false;
-      base.setAlpha(0.7);
-    };
-    const releaseRight = () => {
-      this.virtualControls.right = false;
-      base.setAlpha(0.7);
-    };
-
-    leftZone.on("pointerdown", () => {
+    this.addMoveButton(x - 56, y, "←", () => {
       this.virtualControls.left = true;
       this.virtualControls.right = false;
-      base.setAlpha(0.95);
+    }, () => {
+      this.virtualControls.left = false;
     });
-    leftZone.on("pointerup", releaseLeft);
-    leftZone.on("pointerout", releaseLeft);
 
-    rightZone.on("pointerdown", () => {
+    this.addMoveButton(x + 56, y, "→", () => {
       this.virtualControls.right = true;
       this.virtualControls.left = false;
-      base.setAlpha(0.95);
+    }, () => {
+      this.virtualControls.right = false;
     });
-    rightZone.on("pointerup", releaseRight);
-    rightZone.on("pointerout", releaseRight);
+  }
+
+  private addMoveButton(
+    x: number,
+    y: number,
+    label: string,
+    onDown: () => void,
+    onUp: () => void,
+  ): void {
+    const radius = 42;
+    const bg = this.add
+      .circle(x, y, radius, 0x2f7ac8, 0.82)
+      .setDepth(154)
+      .setScrollFactor(0)
+      .setStrokeStyle(4, 0xffffff, 0.92)
+      .setInteractive({ useHandCursor: true });
+    this.add
+      .circle(x - 12, y - 14, 10, 0xffffff, 0.2)
+      .setDepth(155)
+      .setScrollFactor(0);
+    const text = this.add
+      .text(x, y, label, {
+        fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
+        fontSize: "34px",
+        fontStyle: "900",
+        color: "#ffffff",
+      })
+      .setOrigin(0.5)
+      .setDepth(156)
+      .setScrollFactor(0);
+
+    bg.on("pointerdown", () => {
+      bg.setAlpha(1);
+      bg.setScale(1.05);
+      text.setScale(1.05);
+      onDown();
+    });
+    const release = () => {
+      bg.setAlpha(0.82);
+      bg.setScale(1);
+      text.setScale(1);
+      onUp();
+    };
+    bg.on("pointerup", release);
+    bg.on("pointerout", release);
+    bg.on("pointerupoutside", release);
   }
 
   private addHoldButton(
@@ -767,7 +772,7 @@ export class GameScene extends Phaser.Scene {
 
     switch (id) {
       case "inori": {
-        this.player.setVelocityY(-780);
+        this.player.setVelocityY(-940);
         this.cooldowns[id] = now + (config.specialCooldown ?? 0.5) * 1000;
         this.spawnStarBurst(this.player.x, this.player.y - 12, config.color, 14);
         break;
@@ -966,6 +971,10 @@ export class GameScene extends Phaser.Scene {
     this.takeDamage();
   }
 
+  private isAkariDashActive(time = this.time.now): boolean {
+    return this.player.activeId === "akari" && time < this.dashUntil;
+  }
+
   private takeDamage(forceRespawn = false): void {
     const now = this.time.now;
     if (this.isGameOver || this.isClearing) {
@@ -1060,6 +1069,14 @@ export class GameScene extends Phaser.Scene {
     const rect = rock as Phaser.GameObjects.Rectangle;
     this.spawnStarBurst(rect.x, rect.y, 0xff7a3c, 9);
     rect.destroy();
+  }
+
+  private breakHazard(hazard: Phaser.GameObjects.GameObject): void {
+    const zone = hazard as Phaser.GameObjects.Zone;
+    const visuals = zone.getData("visuals") as Phaser.GameObjects.Triangle[] | undefined;
+    this.spawnStarBurst(zone.x, zone.y, 0xff7b67, 10);
+    visuals?.forEach((visual) => visual.destroy());
+    zone.destroy();
   }
 
   private breakDashWall(wall: Phaser.GameObjects.GameObject): void {
