@@ -25,7 +25,7 @@ type VirtualControls = {
 export class BossScene extends Phaser.Scene {
   private player!: Player;
   private boss!: Phaser.Physics.Arcade.Image;
-  private bossHitZone!: Phaser.GameObjects.Zone;
+  private bossHitZone!: Phaser.GameObjects.Rectangle;
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private projectiles!: Phaser.Physics.Arcade.Group;
   private dinosaurs!: Phaser.Physics.Arcade.Group;
@@ -56,6 +56,7 @@ export class BossScene extends Phaser.Scene {
   private nextBeamAt = 0;
   private beamRect?: Phaser.GameObjects.Rectangle;
   private beamUntil = 0;
+  private beamCharging = false;
   private isEnding = false;
   private isGameOver = false;
   private retryLayer?: Phaser.GameObjects.Container;
@@ -92,6 +93,7 @@ export class BossScene extends Phaser.Scene {
     this.nextOrbAt = this.time.now + 1200;
     this.nextBeamAt = this.time.now + 2800;
     this.beamUntil = 0;
+    this.beamCharging = false;
     this.isEnding = false;
     this.isGameOver = false;
     this.retryLayer = undefined;
@@ -132,12 +134,10 @@ export class BossScene extends Phaser.Scene {
     bossBody.setSize(114, 202, true);
     bossBody.setOffset((this.boss.width - 114) / 2, this.boss.height - 216);
 
-    this.bossHitZone = this.add.zone(this.boss.x, this.boss.y - 112, 130, 216);
+    this.bossHitZone = this.add.rectangle(this.boss.x, this.boss.y - 112, 130, 216, 0xff70c7, 0);
     this.physics.add.existing(this.bossHitZone);
     const hitBody = this.bossHitZone.body as Phaser.Physics.Arcade.Body;
-    hitBody.allowGravity = false;
-    hitBody.immovable = true;
-    hitBody.moves = false;
+    this.configureBossHitBody(hitBody);
 
     this.physics.add.collider(this.player, this.platforms);
     this.physics.add.overlap(this.player, this.projectiles, (_, projectile) => {
@@ -280,19 +280,17 @@ export class BossScene extends Phaser.Scene {
     this.topIconImages = [];
     this.selectIconImages = [];
     this.uiText = this.add
-      .text(18, 16, "", {
+      .text(34, 24, "", {
         fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
-        fontSize: "17px",
+        fontSize: "16px",
         fontStyle: "700",
         color: "#32261f",
-        backgroundColor: "rgba(255,255,255,0.82)",
-        padding: { x: 14, y: 10 },
       })
       .setDepth(101)
       .setScrollFactor(0);
 
     this.specialLabelText = this.add
-      .text(22, 87, "SPECIAL", {
+      .text(22, 105, "SPECIAL", {
         fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
         fontSize: "12px",
         fontStyle: "900",
@@ -302,7 +300,7 @@ export class BossScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.abilityText = this.add
-      .text(30, 111, "", {
+      .text(30, 129, "", {
         fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
         fontSize: "15px",
         fontStyle: "700",
@@ -610,23 +608,49 @@ export class BossScene extends Phaser.Scene {
     this.boss.y = 508 + Math.sin(time / 560) * 5;
     this.boss.setFlipX(sideToPlayer > 0);
     this.boss.rotation = Math.sin(time / 850) * 0.018;
-    this.bossHitZone.setPosition(this.boss.x, this.boss.y - 112);
-    (this.bossHitZone.body as Phaser.Physics.Arcade.Body).reset(this.boss.x, this.boss.y - 112);
+    this.syncBossHitZone();
 
-    if (time >= this.nextOrbAt) {
+    if (time >= this.nextOrbAt && !this.beamRect && !this.beamCharging) {
       this.fireOrbs();
       this.nextOrbAt = time + Phaser.Math.Between(1300, 1700);
     }
 
     if (time >= this.nextBeamAt) {
-      this.fireBeam();
-      this.nextBeamAt = time + Phaser.Math.Between(4100, 5200);
+      if (this.hasActiveBossOrbs()) {
+        this.nextBeamAt = time + 700;
+      } else {
+        this.fireBeam();
+        this.nextBeamAt = time + Phaser.Math.Between(4300, 5400);
+      }
     }
 
     if (this.beamRect && time >= this.beamUntil) {
       this.beamRect.destroy();
       this.beamRect = undefined;
     }
+  }
+
+  private configureBossHitBody(body: Phaser.Physics.Arcade.Body): void {
+    body.allowGravity = false;
+    body.immovable = true;
+    body.moves = false;
+    body.setSize(130, 216, true);
+  }
+
+  private syncBossHitZone(): void {
+    const x = this.boss.x;
+    const y = this.boss.y - 112;
+    this.bossHitZone.setPosition(x, y);
+    let hitBody = this.bossHitZone.body as Phaser.Physics.Arcade.Body | undefined;
+    if (!hitBody) {
+      this.physics.add.existing(this.bossHitZone);
+      hitBody = this.bossHitZone.body as Phaser.Physics.Arcade.Body | undefined;
+      if (!hitBody) {
+        return;
+      }
+      this.configureBossHitBody(hitBody);
+    }
+    hitBody.reset(x, y);
   }
 
   private updateActors(time: number): void {
@@ -644,6 +668,10 @@ export class BossScene extends Phaser.Scene {
         sprite.destroy();
       }
     });
+  }
+
+  private hasActiveBossOrbs(): boolean {
+    return this.projectiles.getChildren().some((projectile) => projectile.active);
   }
 
   private updateBossTouch(time: number): void {
@@ -715,14 +743,14 @@ export class BossScene extends Phaser.Scene {
 
     this.uiFx.clear();
     this.uiFx.fillStyle(0x2f3a45, 0.16);
-    this.uiFx.fillRoundedRect(22, 22, 360, 52, 16);
+    this.uiFx.fillRoundedRect(22, 22, 380, 78, 16);
     this.uiFx.fillStyle(0xffffff, 0.92);
-    this.uiFx.fillRoundedRect(18, 16, 360, 52, 16);
+    this.uiFx.fillRoundedRect(18, 16, 380, 78, 16);
     this.uiFx.lineStyle(3, config.color, 0.9);
-    this.uiFx.strokeRoundedRect(18, 16, 360, 52, 16);
+    this.uiFx.strokeRoundedRect(18, 16, 380, 78, 16);
     this.uiFx.fillStyle(config.color, 0.92);
-    this.uiFx.fillRoundedRect(18, 16, 10, 52, 8);
-    this.drawHeartHud(206, 42);
+    this.uiFx.fillRoundedRect(18, 16, 10, 78, 8);
+    this.drawHeartHud(52, 72);
 
     this.uiFx.fillStyle(0xffffff, 0.9);
     this.uiFx.fillRoundedRect(420, 18, 320, 26, 13);
@@ -735,9 +763,9 @@ export class BossScene extends Phaser.Scene {
 
     const abilityBoxWidth = Phaser.Math.Clamp(this.abilityText.width + 30, 150, 340);
     this.uiFx.fillStyle(0xffffff, 0.86);
-    this.uiFx.fillRoundedRect(18, 101, abilityBoxWidth, 36, 10);
+    this.uiFx.fillRoundedRect(18, 119, abilityBoxWidth, 36, 10);
     this.uiFx.lineStyle(3, config.color, 0.95);
-    this.uiFx.strokeRoundedRect(18, 101, abilityBoxWidth, 36, 10);
+    this.uiFx.strokeRoundedRect(18, 119, abilityBoxWidth, 36, 10);
 
     this.uiFx.fillStyle(0xffffff, 0.8);
     this.uiFx.fillRoundedRect(668, 58, 274, 54, 14);
@@ -903,7 +931,7 @@ export class BossScene extends Phaser.Scene {
   }
 
   private fireBeam(): void {
-    if (this.beamRect) {
+    if (this.beamRect || this.beamCharging || this.hasActiveBossOrbs()) {
       return;
     }
 
@@ -912,21 +940,39 @@ export class BossScene extends Phaser.Scene {
     const startX = this.boss.x + direction * 52;
     const width = direction < 0 ? startX : 960 - startX;
     const x = direction < 0 ? startX / 2 : startX + width / 2;
-    const warning = this.add.rectangle(x, y, width, 16, 0xff70c7, 0.25).setDepth(24);
+    const chargeX = this.boss.x + direction * 46;
+    const chargeY = this.boss.y - 168;
+    const warning = this.add.rectangle(x, y, width, 12, 0xff70c7, 0.2).setDepth(24);
+    const charge = this.add.circle(chargeX, chargeY, 12, 0xff2e9f, 0.88).setDepth(26);
+    charge.setStrokeStyle(4, 0xffffff, 0.86);
+    this.beamCharging = true;
+    this.boss.setTint(0xffc1ea);
     this.tweens.add({
-      targets: warning,
-      alpha: 0.65,
-      duration: 120,
+      targets: [warning, charge],
+      alpha: 0.72,
+      scaleX: 1.35,
+      scaleY: 1.35,
+      duration: 150,
       yoyo: true,
-      repeat: 3,
+      repeat: 4,
       onComplete: () => {
         warning.destroy();
-        if (this.isGameOver || this.isEnding) {
+        charge.destroy();
+        this.boss.clearTint();
+        this.beamCharging = false;
+        if (this.isGameOver || this.isEnding || this.hasActiveBossOrbs()) {
           return;
         }
-        this.beamRect = this.add.rectangle(x, y, width, 24, 0xff2e9f, 0.78).setDepth(24);
+        this.beamRect = this.add.rectangle(startX, y, 1, 24, 0xff2e9f, 0.78).setDepth(24);
+        this.beamRect.setOrigin(direction < 0 ? 1 : 0, 0.5);
         this.beamRect.setStrokeStyle(4, 0xffffff, 0.9);
-        this.beamUntil = this.time.now + 680;
+        this.beamUntil = this.time.now + 1150;
+        this.tweens.add({
+          targets: this.beamRect,
+          displayWidth: width,
+          duration: 520,
+          ease: "Quad.easeOut",
+        });
       },
     });
   }
