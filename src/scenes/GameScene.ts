@@ -1175,6 +1175,12 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    if (this.isAkariDashActive()) {
+      this.popEnemy(enemy);
+      this.spawnSpeedFlash();
+      return;
+    }
+
     if (this.time.now < this.invincibleUntil) {
       this.popEnemy(enemy);
       return;
