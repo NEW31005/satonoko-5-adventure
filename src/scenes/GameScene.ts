@@ -280,6 +280,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.ensureAnimation("chibitira-run", "chibitiraSheet", [0, 1, 2, 3, 4, 5], 11, -1);
+    this.ensureAnimation("turtle-enemy-walk", "turtleEnemySheet", [0, 1, 2, 3, 4, 5], 7, -1);
   }
 
   private ensureAnimation(
@@ -1042,11 +1043,31 @@ export class GameScene extends Phaser.Scene {
   }
 
   private touchEnemy(enemy: Enemy): void {
-    if (this.time.now < this.invincibleUntil) {
-      this.popEnemy(enemy);
+    if (!enemy.active || this.isGameOver || this.isClearing) {
       return;
     }
+
+    if (this.isEnemyStomp(enemy)) {
+      this.popEnemy(enemy);
+      this.player.setVelocityY(-390);
+      this.spawnStarBurst(this.player.x, this.player.y - 42, 0xffd84d, 5);
+      return;
+    }
+
+    if (this.time.now < this.invincibleUntil) {
+      return;
+    }
+
     this.takeDamage();
+  }
+
+  private isEnemyStomp(enemy: Enemy): boolean {
+    const playerBody = this.player.body as Phaser.Physics.Arcade.Body;
+    const enemyBody = enemy.body as Phaser.Physics.Arcade.Body;
+    const fallingFromAbove = playerBody.velocity.y > 130;
+    const feetNearEnemyTop = playerBody.bottom <= enemyBody.top + 24;
+    const centeredOverEnemy = Math.abs(this.player.x - enemy.x) <= enemy.displayWidth * 0.36;
+    return fallingFromAbove && feetNearEnemyTop && centeredOverEnemy;
   }
 
   private isAkariDashActive(time = this.time.now): boolean {
@@ -1164,7 +1185,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private popEnemy(enemy: Enemy): void {
-    this.spawnStarBurst(enemy.x, enemy.y, 0x8bdc83, 7);
+    this.spawnStarBurst(enemy.x, enemy.y - 48, 0x78b957, 7);
     enemy.destroy();
     this.score += 20;
   }

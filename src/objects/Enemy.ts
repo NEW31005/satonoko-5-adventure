@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 
 export class Enemy extends Phaser.Physics.Arcade.Sprite {
-  private speed = 55;
+  private speed = 48;
 
   constructor(
     scene: Phaser.Scene,
@@ -10,15 +10,19 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     private readonly minX: number,
     private readonly maxX: number,
   ) {
-    super(scene, x, y, "slime");
+    super(scene, x, y, "turtleEnemySheet", 0);
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.setDepth(12);
-    this.setDisplaySize(54, 34);
+    this.setOrigin(0.5, 1);
+    this.setDisplaySize(78, 88);
     this.setVelocityX(this.speed);
+    this.setFlipX(true);
+    this.play("turtle-enemy-walk", true);
 
     const body = this.body as Phaser.Physics.Arcade.Body;
-    body.setSize(44, 24, true);
+    body.setSize(this.frame.width * 0.62, this.frame.height * 0.66, true);
+    body.setOffset(this.frame.width * 0.19, this.frame.height * 0.31);
     body.setBounce(0, 0);
   }
 
@@ -29,10 +33,10 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
     if (this.x <= this.minX) {
       this.setVelocityX(this.speed);
-      this.setFlipX(false);
+      this.setFlipX(true);
     } else if (this.x >= this.maxX) {
       this.setVelocityX(-this.speed);
-      this.setFlipX(true);
+      this.setFlipX(false);
     }
   }
 }

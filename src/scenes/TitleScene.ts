@@ -3,6 +3,7 @@ import { characterOrder, characters } from "../data/characters";
 
 const assetPath = `${import.meta.env.BASE_URL}assets/characters`;
 const bossAssetPath = `${import.meta.env.BASE_URL}assets/boss`;
+const enemyAssetPath = `${import.meta.env.BASE_URL}assets/enemies`;
 
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -19,6 +20,11 @@ export class TitleScene extends Phaser.Scene {
     this.load.image("akari", `${assetPath}/akari.png`);
     this.load.image("chibitira", `${assetPath}/chibitira.png`);
     this.load.image("finalBoss", `${bossAssetPath}/final_boss.png`);
+    this.load.image("turtleEnemy", `${enemyAssetPath}/turtle_enemy.png`);
+    this.load.spritesheet("turtleEnemySheet", `${enemyAssetPath}/turtle_enemy_sheet.png`, {
+      frameWidth: 260,
+      frameHeight: 260,
+    });
     characterOrder.forEach((id) => {
       const character = characters[id];
       this.load.image(character.iconKey, `${assetPath}/icons/${id}_face.png`);
@@ -59,6 +65,11 @@ export class TitleScene extends Phaser.Scene {
     this.add
       .rectangle(480, 312, 910, 386, 0xffffff, 0.72)
       .setStrokeStyle(2, 0xffffff, 0.85);
+    this.add
+      .image(285, 326, "turtleEnemy")
+      .setDisplaySize(260, 328)
+      .setAlpha(0.2)
+      .setTint(0x6caf5f);
     this.add
       .image(665, 318, "finalBoss")
       .setDisplaySize(330, 425)
