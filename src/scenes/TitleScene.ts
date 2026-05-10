@@ -1,11 +1,20 @@
 import Phaser from "phaser";
 import { characterOrder, characters } from "../data/characters";
+import { defaultDifficultyId, difficulties, DifficultyId } from "../data/difficulty";
 
 const assetPath = `${import.meta.env.BASE_URL}assets/characters`;
 const bossAssetPath = `${import.meta.env.BASE_URL}assets/boss`;
 const enemyAssetPath = `${import.meta.env.BASE_URL}assets/enemies`;
 
 export class TitleScene extends Phaser.Scene {
+  private selectedDifficultyId: DifficultyId = defaultDifficultyId;
+  private difficultyButtons: Array<{
+    id: DifficultyId;
+    box: Phaser.GameObjects.Rectangle;
+    label: Phaser.GameObjects.Text;
+    detail: Phaser.GameObjects.Text;
+  }> = [];
+
   constructor() {
     super("TitleScene");
   }
@@ -77,14 +86,16 @@ export class TitleScene extends Phaser.Scene {
       .setTint(0x9b5cff);
     this.add.image(480, 310, "lineupTitle").setDisplaySize(760, 380).setAlpha(0.98);
 
+    this.createDifficultySelector();
+
     const start = this.add
-      .text(480, 490, "タップ / Space でスタート", {
+      .text(480, 504, "タップ / Space でスタート", {
         fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
-        fontSize: "24px",
+        fontSize: "22px",
         fontStyle: "700",
         color: "#ffffff",
         backgroundColor: "#2f7ac8",
-        padding: { x: 26, y: 12 },
+        padding: { x: 24, y: 10 },
       })
       .setOrigin(0.5);
 
@@ -97,11 +108,84 @@ export class TitleScene extends Phaser.Scene {
       ease: "Sine.easeInOut",
     });
 
-    this.input.keyboard?.once("keydown-SPACE", () => {
-      this.scene.start("GameScene");
+    const startGame = () => {
+      this.scene.start("GameScene", { difficulty: this.selectedDifficultyId });
+    };
+
+    this.input.keyboard?.on("keydown-A", () => this.selectAdjacentDifficulty(-1));
+    this.input.keyboard?.on("keydown-S", () => this.selectAdjacentDifficulty(1));
+    this.input.keyboard?.on("keydown-LEFT", () => this.selectAdjacentDifficulty(-1));
+    this.input.keyboard?.on("keydown-RIGHT", () => this.selectAdjacentDifficulty(1));
+    this.input.keyboard?.once("keydown-SPACE", startGame);
+    start.setInteractive({ useHandCursor: true }).on("pointerdown", startGame);
+  }
+
+  private createDifficultySelector(): void {
+    const ids: DifficultyId[] = ["easy", "normal", "hard"];
+    this.difficultyButtons = [];
+
+    this.add
+      .text(480, 398, "難易度", {
+        fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
+        fontSize: "16px",
+        fontStyle: "900",
+        color: "#4a2a10",
+        backgroundColor: "rgba(255,255,255,0.82)",
+        padding: { x: 18, y: 4 },
+      })
+      .setOrigin(0.5);
+
+    ids.forEach((id, index) => {
+      const config = difficulties[id];
+      const x = 300 + index * 180;
+      const box = this.add
+        .rectangle(x, 438, 164, 48, 0xffffff, 0.9)
+        .setStrokeStyle(3, config.color, 0.9)
+        .setInteractive({ useHandCursor: true });
+      const label = this.add
+        .text(x, 429, config.label, {
+          fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
+          fontSize: "18px",
+          fontStyle: "900",
+          color: "#2d241f",
+        })
+        .setOrigin(0.5);
+      const detail = this.add
+        .text(x, 450, config.description, {
+          fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
+          fontSize: "11px",
+          fontStyle: "700",
+          color: "#5d6470",
+        })
+        .setOrigin(0.5);
+
+      box.on("pointerdown", () => {
+        this.selectedDifficultyId = id;
+        this.updateDifficultySelector();
+      });
+
+      this.difficultyButtons.push({ id, box, label, detail });
     });
-    start.setInteractive({ useHandCursor: true }).on("pointerdown", () => {
-      this.scene.start("GameScene");
+
+    this.updateDifficultySelector();
+  }
+
+  private selectAdjacentDifficulty(direction: -1 | 1): void {
+    const ids: DifficultyId[] = ["easy", "normal", "hard"];
+    const currentIndex = ids.indexOf(this.selectedDifficultyId);
+    this.selectedDifficultyId = ids[Phaser.Math.Wrap(currentIndex + direction, 0, ids.length)];
+    this.updateDifficultySelector();
+  }
+
+  private updateDifficultySelector(): void {
+    this.difficultyButtons.forEach(({ id, box, label, detail }) => {
+      const config = difficulties[id];
+      const selected = id === this.selectedDifficultyId;
+      box.setFillStyle(selected ? config.color : 0xffffff, selected ? 0.92 : 0.86);
+      box.setStrokeStyle(selected ? 5 : 3, selected ? 0xffffff : config.color, selected ? 1 : 0.9);
+      label.setColor(selected ? "#ffffff" : "#2d241f");
+      detail.setColor(selected ? "#ffffff" : "#5d6470");
+      label.setScale(selected ? 1.05 : 1);
     });
   }
 

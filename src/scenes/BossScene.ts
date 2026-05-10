@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { characterOrder, characters, CharacterId } from "../data/characters";
+import { defaultDifficultyId, DifficultyId, resolveDifficulty } from "../data/difficulty";
 import { Dinosaur } from "../objects/Dinosaur";
 import { Player } from "../objects/Player";
 
@@ -39,6 +40,7 @@ export class BossScene extends Phaser.Scene {
   private characterIndex = 0;
   private score = 0;
   private starsCollected = 0;
+  private difficultyId: DifficultyId = defaultDifficultyId;
   private bossHp = 45;
   private readonly bossMaxHp = 45;
   private bossInvulnerableUntil = 0;
@@ -66,9 +68,10 @@ export class BossScene extends Phaser.Scene {
     super("BossScene");
   }
 
-  init(data?: { score?: number; stars?: number }): void {
+  init(data?: { score?: number; stars?: number; difficulty?: DifficultyId }): void {
     this.score = data?.score ?? 0;
     this.starsCollected = data?.stars ?? 0;
+    this.difficultyId = resolveDifficulty(data?.difficulty).id;
   }
 
   create(): void {
@@ -983,6 +986,7 @@ export class BossScene extends Phaser.Scene {
     this.scene.restart({
       score: this.score,
       stars: this.starsCollected,
+      difficulty: this.difficultyId,
     });
   }
 
@@ -1004,6 +1008,7 @@ export class BossScene extends Phaser.Scene {
         round: 5,
         totalRounds: 5,
         bossCleared: true,
+        difficulty: this.difficultyId,
       });
     });
   }

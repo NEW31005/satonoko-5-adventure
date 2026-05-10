@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { characterOrder, characters, CharacterId } from "../data/characters";
+import { defaultDifficultyId, DifficultyConfig, DifficultyId, difficulties, resolveDifficulty } from "../data/difficulty";
 import { levelData, RectSpec, roundCount, RoundData, rounds } from "../data/levelData";
 import { Dinosaur } from "../objects/Dinosaur";
 import { Enemy } from "../objects/Enemy";
@@ -52,6 +53,9 @@ export class GameScene extends Phaser.Scene {
   private score = 0;
   private starsCollected = 0;
   private hp = 3;
+  private maxHp = difficulties[defaultDifficultyId].maxHp;
+  private difficulty: DifficultyConfig = difficulties[defaultDifficultyId];
+  private difficultyId: DifficultyId = defaultDifficultyId;
   private checkpoint = { ...levelData.checkpoint };
   private damageLockUntil = 0;
   private dashUntil = 0;
@@ -74,18 +78,21 @@ export class GameScene extends Phaser.Scene {
     super("GameScene");
   }
 
-  init(data?: { roundIndex?: number; score?: number; stars?: number }): void {
+  init(data?: { roundIndex?: number; score?: number; stars?: number; difficulty?: DifficultyId }): void {
     this.currentRoundIndex = Phaser.Math.Clamp(data?.roundIndex ?? 0, 0, roundCount - 1);
     this.level = rounds[this.currentRoundIndex] ?? rounds[0];
     this.roundStartScore = data?.score ?? 0;
     this.roundStartStars = data?.stars ?? 0;
+    this.difficulty = resolveDifficulty(data?.difficulty);
+    this.difficultyId = this.difficulty.id;
+    this.maxHp = this.difficulty.maxHp;
   }
 
   create(): void {
     this.characterIndex = 0;
     this.score = this.roundStartScore;
     this.starsCollected = this.roundStartStars;
-    this.hp = 3;
+    this.hp = this.maxHp;
     this.checkpoint = { ...this.level.checkpoint };
     this.damageLockUntil = 0;
     this.dashUntil = 0;
@@ -423,7 +430,16 @@ export class GameScene extends Phaser.Scene {
 
   private createEnemies(): void {
     this.level.enemies.forEach((enemy) => {
-      this.enemies.add(new Enemy(this, enemy.x, enemy.y, enemy.minX, enemy.maxX));
+      const count = this.difficulty.enemyMultiplier;
+      for (let index = 0; index < count; index += 1) {
+        const safeMin = enemy.minX + 34;
+        const safeMax = enemy.maxX - 34;
+        const x =
+          count === 1 || safeMax <= safeMin
+            ? enemy.x
+            : Phaser.Math.Linear(safeMin, safeMax, index / (count - 1));
+        this.enemies.add(new Enemy(this, x, enemy.y, enemy.minX, enemy.maxX));
+      }
     });
   }
 
@@ -954,6 +970,7 @@ export class GameScene extends Phaser.Scene {
       roundIndex: this.currentRoundIndex,
       score: this.roundStartScore,
       stars: this.roundStartStars,
+      difficulty: this.difficultyId,
     });
   }
 
@@ -963,6 +980,7 @@ export class GameScene extends Phaser.Scene {
       this.scene.start("BossScene", {
         score: this.score,
         stars: this.starsCollected,
+        difficulty: this.difficultyId,
       });
       return;
     }
@@ -971,6 +989,7 @@ export class GameScene extends Phaser.Scene {
       roundIndex: nextRoundIndex,
       score: this.score,
       stars: this.starsCollected,
+      difficulty: this.difficultyId,
     });
   }
 
@@ -1006,8 +1025,9 @@ export class GameScene extends Phaser.Scene {
     const config = this.player.config;
     this.uiText.setText(`${config.name}（${config.kana}）`);
     this.scoreText.setText(`スコア ${this.score}`);
-    const heartHudX = Phaser.Math.Clamp(this.uiText.x + this.uiText.width + 24, 164, 214);
-    this.scoreText.setX(heartHudX + 94);
+    const heartHudX = Phaser.Math.Clamp(this.uiText.x + this.uiText.width + 18, 154, this.maxHp > 5 ? 170 : 214);
+    const heartSpacing = this.getHeartSpacing();
+    this.scoreText.setX(heartHudX + this.maxHp * heartSpacing + 8);
     this.stageTitleText.setText(`R${this.level.round} ${this.level.title}`);
 
     this.abilityText.setText(this.getSpecialDisplayName());
@@ -1045,12 +1065,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawTopHud(characterColor: number): void {
+    const hudWidth = this.maxHp > 5 ? 448 : this.maxHp > 3 ? 414 : 390;
     this.uiFx.fillStyle(0x2f3a45, 0.16);
-    this.uiFx.fillRoundedRect(22, 22, 390, 52, 16);
+    this.uiFx.fillRoundedRect(22, 22, hudWidth, 52, 16);
     this.uiFx.fillStyle(0xffffff, 0.92);
-    this.uiFx.fillRoundedRect(18, 16, 390, 52, 16);
+    this.uiFx.fillRoundedRect(18, 16, hudWidth, 52, 16);
     this.uiFx.lineStyle(3, characterColor, 0.9);
-    this.uiFx.strokeRoundedRect(18, 16, 390, 52, 16);
+    this.uiFx.strokeRoundedRect(18, 16, hudWidth, 52, 16);
     this.uiFx.fillStyle(characterColor, 0.92);
     this.uiFx.fillRoundedRect(18, 16, 10, 52, 8);
 
@@ -1065,31 +1086,50 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawHeartHud(x: number, y: number): void {
-    for (let index = 0; index < 3; index += 1) {
-      const heartX = x + index * 28;
+    const spacing = this.getHeartSpacing();
+    const scale = this.maxHp > 5 ? 0.78 : this.maxHp > 3 ? 0.86 : 1;
+    for (let index = 0; index < this.maxHp; index += 1) {
+      const heartX = x + index * spacing;
       const filled = index < this.hp;
       const fillColor = filled ? 0xff4d78 : 0xffffff;
       const strokeColor = filled ? 0xd72f5f : 0xffabc0;
 
       this.uiFx.fillStyle(0x2f3a45, 0.14);
-      this.drawHeartShape(heartX + 1, y + 2, 0x2f3a45, 0.14);
-      this.drawHeartShape(heartX, y, fillColor, filled ? 0.98 : 0.76);
-      this.uiFx.lineStyle(3, strokeColor, 0.95);
-      this.uiFx.strokeCircle(heartX - 5, y - 4, 6);
-      this.uiFx.strokeCircle(heartX + 5, y - 4, 6);
-      this.uiFx.strokeTriangle(heartX - 12, y - 1, heartX + 12, y - 1, heartX, y + 14);
+      this.drawHeartShape(heartX + 1, y + 2, 0x2f3a45, 0.14, scale);
+      this.drawHeartShape(heartX, y, fillColor, filled ? 0.98 : 0.76, scale);
+      this.uiFx.lineStyle(this.maxHp > 5 ? 2 : 3, strokeColor, 0.95);
+      this.uiFx.strokeCircle(heartX - 5 * scale, y - 4 * scale, 6 * scale);
+      this.uiFx.strokeCircle(heartX + 5 * scale, y - 4 * scale, 6 * scale);
+      this.uiFx.strokeTriangle(
+        heartX - 12 * scale,
+        y - 1 * scale,
+        heartX + 12 * scale,
+        y - 1 * scale,
+        heartX,
+        y + 14 * scale,
+      );
       if (filled) {
         this.uiFx.fillStyle(0xffffff, 0.52);
-        this.uiFx.fillCircle(heartX - 4, y - 6, 3);
+        this.uiFx.fillCircle(heartX - 4 * scale, y - 6 * scale, 3 * scale);
       }
     }
   }
 
-  private drawHeartShape(x: number, y: number, color: number, alpha: number): void {
+  private getHeartSpacing(): number {
+    if (this.maxHp > 5) {
+      return 22;
+    }
+    if (this.maxHp > 3) {
+      return 25;
+    }
+    return 28;
+  }
+
+  private drawHeartShape(x: number, y: number, color: number, alpha: number, scale = 1): void {
     this.uiFx.fillStyle(color, alpha);
-    this.uiFx.fillCircle(x - 5, y - 4, 7);
-    this.uiFx.fillCircle(x + 5, y - 4, 7);
-    this.uiFx.fillTriangle(x - 13, y - 1, x + 13, y - 1, x, y + 15);
+    this.uiFx.fillCircle(x - 5 * scale, y - 4 * scale, 7 * scale);
+    this.uiFx.fillCircle(x + 5 * scale, y - 4 * scale, 7 * scale);
+    this.uiFx.fillTriangle(x - 13 * scale, y - 1 * scale, x + 13 * scale, y - 1 * scale, x, y + 15 * scale);
   }
 
   private getSpecialDisplayName(): string {
@@ -1158,7 +1198,7 @@ export class GameScene extends Phaser.Scene {
 
   private collectHeart(heart: Phaser.GameObjects.GameObject): void {
     const sprite = heart as Phaser.GameObjects.Sprite;
-    this.hp = Math.min(3, this.hp + 1);
+    this.hp = Math.min(this.maxHp, this.hp + 1);
     this.spawnRing(sprite.x, sprite.y, 0xff5d80);
     sprite.destroy();
   }

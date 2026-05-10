@@ -1,16 +1,25 @@
 import Phaser from "phaser";
+import { defaultDifficultyId, DifficultyId, resolveDifficulty } from "../data/difficulty";
 
 export class ClearScene extends Phaser.Scene {
   constructor() {
     super("ClearScene");
   }
 
-  create(data: { score?: number; stars?: number; round?: number; totalRounds?: number; bossCleared?: boolean }): void {
+  create(data: {
+    score?: number;
+    stars?: number;
+    round?: number;
+    totalRounds?: number;
+    bossCleared?: boolean;
+    difficulty?: DifficultyId;
+  }): void {
     this.cameras.main.setBackgroundColor("#fffaf0");
 
     const score = data.score ?? 0;
     const stars = data.stars ?? 0;
     const totalRounds = data.totalRounds ?? 5;
+    const difficultyId = resolveDifficulty(data.difficulty ?? defaultDifficultyId).id;
 
     this.add
       .text(480, 86, data.bossCleared ? "ラスボス撃破！" : "全ラウンドクリア！", {
@@ -54,7 +63,7 @@ export class ClearScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const restart = () => {
-      this.scene.start("GameScene", { roundIndex: 0, score: 0, stars: 0 });
+      this.scene.start("GameScene", { roundIndex: 0, score: 0, stars: 0, difficulty: difficultyId });
     };
     this.input.keyboard?.once("keydown-SPACE", restart);
     this.input.once("pointerdown", restart);
