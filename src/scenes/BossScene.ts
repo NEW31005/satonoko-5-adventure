@@ -8,9 +8,9 @@ type ControlKeys = {
   right: Phaser.Input.Keyboard.Key;
   up: Phaser.Input.Keyboard.Key;
   space: Phaser.Input.Keyboard.Key;
-  x: Phaser.Input.Keyboard.Key;
-  q: Phaser.Input.Keyboard.Key;
-  e: Phaser.Input.Keyboard.Key;
+  special: Phaser.Input.Keyboard.Key;
+  previousCharacter: Phaser.Input.Keyboard.Key;
+  nextCharacter: Phaser.Input.Keyboard.Key;
   r: Phaser.Input.Keyboard.Key;
 };
 
@@ -144,9 +144,9 @@ export class BossScene extends Phaser.Scene {
       right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
       up: Phaser.Input.Keyboard.KeyCodes.UP,
       space: Phaser.Input.Keyboard.KeyCodes.SPACE,
-      x: Phaser.Input.Keyboard.KeyCodes.X,
-      q: Phaser.Input.Keyboard.KeyCodes.Q,
-      e: Phaser.Input.Keyboard.KeyCodes.E,
+      special: Phaser.Input.Keyboard.KeyCodes.D,
+      previousCharacter: Phaser.Input.Keyboard.KeyCodes.A,
+      nextCharacter: Phaser.Input.Keyboard.KeyCodes.S,
       r: Phaser.Input.Keyboard.KeyCodes.R,
     }) as ControlKeys;
 
@@ -169,13 +169,13 @@ export class BossScene extends Phaser.Scene {
       return;
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.controls.q)) {
+    if (Phaser.Input.Keyboard.JustDown(this.controls.previousCharacter)) {
       this.switchCharacter(-1);
-    } else if (Phaser.Input.Keyboard.JustDown(this.controls.e)) {
+    } else if (Phaser.Input.Keyboard.JustDown(this.controls.nextCharacter)) {
       this.switchCharacter(1);
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.controls.x)) {
+    if (Phaser.Input.Keyboard.JustDown(this.controls.special)) {
       this.useSpecial();
     }
 
