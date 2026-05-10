@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { characterOrder, characters, CharacterId } from "../data/characters";
-import { defaultDifficultyId, DifficultyId, resolveDifficulty } from "../data/difficulty";
+import { defaultDifficultyId, DifficultyConfig, DifficultyId, difficulties, resolveDifficulty } from "../data/difficulty";
 import { Dinosaur } from "../objects/Dinosaur";
 import { Player } from "../objects/Player";
 
@@ -41,6 +41,9 @@ export class BossScene extends Phaser.Scene {
   private score = 0;
   private starsCollected = 0;
   private difficultyId: DifficultyId = defaultDifficultyId;
+  private difficulty: DifficultyConfig = difficulties[defaultDifficultyId];
+  private hp = difficulties[defaultDifficultyId].maxHp;
+  private maxHp = difficulties[defaultDifficultyId].maxHp;
   private bossHp = 45;
   private readonly bossMaxHp = 45;
   private bossInvulnerableUntil = 0;
@@ -71,11 +74,14 @@ export class BossScene extends Phaser.Scene {
   init(data?: { score?: number; stars?: number; difficulty?: DifficultyId }): void {
     this.score = data?.score ?? 0;
     this.starsCollected = data?.stars ?? 0;
-    this.difficultyId = resolveDifficulty(data?.difficulty).id;
+    this.difficulty = resolveDifficulty(data?.difficulty);
+    this.difficultyId = this.difficulty.id;
+    this.maxHp = this.difficulty.maxHp;
   }
 
   create(): void {
     this.characterIndex = 0;
+    this.hp = this.maxHp;
     this.bossHp = this.bossMaxHp;
     this.bossInvulnerableUntil = 0;
     this.damageLockUntil = 0;
@@ -118,15 +124,15 @@ export class BossScene extends Phaser.Scene {
     this.player.facing = 1;
 
     this.boss = this.physics.add.image(660, 508, "finalBoss").setOrigin(0.5, 1).setDepth(14);
-    this.boss.setDisplaySize(270, 348);
+    this.boss.setDisplaySize(200, 258);
     this.boss.setImmovable(true);
     this.boss.setGravityY(0);
     const bossBody = this.boss.body as Phaser.Physics.Arcade.Body;
     bossBody.allowGravity = false;
-    bossBody.setSize(150, 270, true);
-    bossBody.setOffset((this.boss.width - 150) / 2, this.boss.height - 286);
+    bossBody.setSize(114, 202, true);
+    bossBody.setOffset((this.boss.width - 114) / 2, this.boss.height - 216);
 
-    this.bossHitZone = this.add.zone(this.boss.x, this.boss.y - 150, 170, 292);
+    this.bossHitZone = this.add.zone(this.boss.x, this.boss.y - 112, 130, 216);
     this.physics.add.existing(this.bossHitZone);
     const hitBody = this.bossHitZone.body as Phaser.Physics.Arcade.Body;
     hitBody.allowGravity = false;
@@ -192,7 +198,7 @@ export class BossScene extends Phaser.Scene {
     this.updateUi(time);
 
     if (this.player.y > 565) {
-      this.showRetryOverlay();
+      this.takeDamage(undefined, true);
     }
   }
 
@@ -596,14 +602,16 @@ export class BossScene extends Phaser.Scene {
   }
 
   private updateBoss(time: number, delta: number): void {
-    const dx = this.player.x - this.boss.x;
-    const speed = Phaser.Math.Clamp(dx * 0.18, -58, 58);
-    this.boss.x = Phaser.Math.Clamp(this.boss.x + speed * (delta / 1000), 300, 780);
+    const sideToPlayer = this.player.x < this.boss.x ? -1 : 1;
+    const distance = 190 + Math.sin(time / 820) * 70;
+    const targetX = Phaser.Math.Clamp(this.player.x - sideToPlayer * distance, 210, 800);
+    const speed = Phaser.Math.Clamp((targetX - this.boss.x) * 0.55, -92, 92);
+    this.boss.x = Phaser.Math.Clamp(this.boss.x + speed * (delta / 1000), 190, 820);
     this.boss.y = 508 + Math.sin(time / 560) * 5;
-    this.boss.setFlipX(this.player.x > this.boss.x);
+    this.boss.setFlipX(sideToPlayer > 0);
     this.boss.rotation = Math.sin(time / 850) * 0.018;
-    this.bossHitZone.setPosition(this.boss.x, this.boss.y - 150);
-    (this.bossHitZone.body as Phaser.Physics.Arcade.Body).reset(this.boss.x, this.boss.y - 150);
+    this.bossHitZone.setPosition(this.boss.x, this.boss.y - 112);
+    (this.bossHitZone.body as Phaser.Physics.Arcade.Body).reset(this.boss.x, this.boss.y - 112);
 
     if (time >= this.nextOrbAt) {
       this.fireOrbs();
@@ -653,7 +661,7 @@ export class BossScene extends Phaser.Scene {
     const playerBody = this.player.body as Phaser.Physics.Arcade.Body;
     const isStomp =
       playerBody.velocity.y > 90 &&
-      playerBounds.bottom <= headRect.bottom + 18 &&
+      playerBounds.bottom <= headRect.bottom + 34 &&
       Phaser.Geom.Intersects.RectangleToRectangle(playerBounds, headRect);
 
     if (isStomp) {
@@ -662,7 +670,7 @@ export class BossScene extends Phaser.Scene {
       return;
     }
 
-    this.showRetryOverlay();
+    this.takeDamage();
   }
 
   private updateBeamHit(time: number): void {
@@ -671,7 +679,7 @@ export class BossScene extends Phaser.Scene {
     }
 
     if (Phaser.Geom.Intersects.RectangleToRectangle(this.player.getBounds(), this.beamRect.getBounds())) {
-      this.showRetryOverlay();
+      this.takeDamage();
     }
   }
 
@@ -701,19 +709,29 @@ export class BossScene extends Phaser.Scene {
 
   private updateUi(time: number): void {
     const config = this.player.config;
-    this.uiText.setText(`ラスボス  ${config.name}（${config.kana}）  スコア ${this.score}`);
+    this.uiText.setText(`ラスボス  ${config.name}（${config.kana}）`);
     this.abilityText.setText(this.getSpecialDisplayName());
     this.specialLabelText.setColor(config.uiColor);
 
     this.uiFx.clear();
+    this.uiFx.fillStyle(0x2f3a45, 0.16);
+    this.uiFx.fillRoundedRect(22, 22, 360, 52, 16);
+    this.uiFx.fillStyle(0xffffff, 0.92);
+    this.uiFx.fillRoundedRect(18, 16, 360, 52, 16);
+    this.uiFx.lineStyle(3, config.color, 0.9);
+    this.uiFx.strokeRoundedRect(18, 16, 360, 52, 16);
+    this.uiFx.fillStyle(config.color, 0.92);
+    this.uiFx.fillRoundedRect(18, 16, 10, 52, 8);
+    this.drawHeartHud(206, 42);
+
     this.uiFx.fillStyle(0xffffff, 0.9);
-    this.uiFx.fillRoundedRect(220, 18, 520, 26, 13);
+    this.uiFx.fillRoundedRect(420, 18, 320, 26, 13);
     this.uiFx.fillStyle(0x2a053d, 0.98);
-    this.uiFx.fillRoundedRect(226, 24, 508, 14, 8);
+    this.uiFx.fillRoundedRect(426, 24, 308, 14, 8);
     this.uiFx.fillStyle(0xff4f9d, 0.98);
-    this.uiFx.fillRoundedRect(226, 24, 508 * (this.bossHp / this.bossMaxHp), 14, 8);
+    this.uiFx.fillRoundedRect(426, 24, 308 * (this.bossHp / this.bossMaxHp), 14, 8);
     this.uiFx.lineStyle(3, 0x8b4de8, 0.95);
-    this.uiFx.strokeRoundedRect(220, 18, 520, 26, 13);
+    this.uiFx.strokeRoundedRect(420, 18, 320, 26, 13);
 
     const abilityBoxWidth = Phaser.Math.Clamp(this.abilityText.width + 30, 150, 340);
     this.uiFx.fillStyle(0xffffff, 0.86);
@@ -733,6 +751,42 @@ export class BossScene extends Phaser.Scene {
     });
     this.syncTopIcons();
     this.syncIconRow();
+  }
+
+  private drawHeartHud(x: number, y: number): void {
+    const spacing = this.maxHp > 5 ? 22 : this.maxHp > 3 ? 25 : 28;
+    const scale = this.maxHp > 5 ? 0.78 : this.maxHp > 3 ? 0.86 : 1;
+    for (let index = 0; index < this.maxHp; index += 1) {
+      const heartX = x + index * spacing;
+      const filled = index < this.hp;
+      const fillColor = filled ? 0xff4d78 : 0xffffff;
+      const strokeColor = filled ? 0xd72f5f : 0xffabc0;
+
+      this.drawHeartShape(heartX + 1, y + 2, 0x2f3a45, 0.14, scale);
+      this.drawHeartShape(heartX, y, fillColor, filled ? 0.98 : 0.76, scale);
+      this.uiFx.lineStyle(this.maxHp > 5 ? 2 : 3, strokeColor, 0.95);
+      this.uiFx.strokeCircle(heartX - 5 * scale, y - 4 * scale, 6 * scale);
+      this.uiFx.strokeCircle(heartX + 5 * scale, y - 4 * scale, 6 * scale);
+      this.uiFx.strokeTriangle(
+        heartX - 12 * scale,
+        y - 1 * scale,
+        heartX + 12 * scale,
+        y - 1 * scale,
+        heartX,
+        y + 14 * scale,
+      );
+      if (filled) {
+        this.uiFx.fillStyle(0xffffff, 0.52);
+        this.uiFx.fillCircle(heartX - 4 * scale, y - 6 * scale, 3 * scale);
+      }
+    }
+  }
+
+  private drawHeartShape(x: number, y: number, color: number, alpha: number, scale = 1): void {
+    this.uiFx.fillStyle(color, alpha);
+    this.uiFx.fillCircle(x - 5 * scale, y - 4 * scale, 7 * scale);
+    this.uiFx.fillCircle(x + 5 * scale, y - 4 * scale, 7 * scale);
+    this.uiFx.fillTriangle(x - 13 * scale, y - 1 * scale, x + 13 * scale, y - 1 * scale, x, y + 15 * scale);
   }
 
   private getSpecialDisplayName(): string {
@@ -833,8 +887,8 @@ export class BossScene extends Phaser.Scene {
 
   private fireOrbs(): void {
     const direction = this.player.x < this.boss.x ? -1 : 1;
-    const startX = this.boss.x + direction * 82;
-    const startY = this.boss.y - 220;
+    const startX = this.boss.x + direction * 62;
+    const startY = this.boss.y - 164;
     const shots = [
       { vx: direction * 250, vy: -145 },
       { vx: direction * 290, vy: 0 },
@@ -855,7 +909,7 @@ export class BossScene extends Phaser.Scene {
 
     const direction = this.player.x < this.boss.x ? -1 : 1;
     const y = 396;
-    const startX = this.boss.x + direction * 70;
+    const startX = this.boss.x + direction * 52;
     const width = direction < 0 ? startX : 960 - startX;
     const x = direction < 0 ? startX / 2 : startX + width / 2;
     const warning = this.add.rectangle(x, y, width, 16, 0xff70c7, 0.25).setDepth(24);
@@ -910,11 +964,33 @@ export class BossScene extends Phaser.Scene {
   }
 
   private defeatPlayer(source?: Phaser.GameObjects.GameObject): void {
-    if (this.time.now < this.damageLockUntil || this.isMatsuriInvincible(this.time.now)) {
+    this.takeDamage(source);
+  }
+
+  private takeDamage(source?: Phaser.GameObjects.GameObject, forceRespawn = false): void {
+    const now = this.time.now;
+    if (now < this.damageLockUntil || this.isMatsuriInvincible(now) || this.isGameOver || this.isEnding) {
       return;
     }
+
     source?.destroy();
-    this.showRetryOverlay();
+    this.hp -= 1;
+    this.damageLockUntil = now + 1300;
+    this.cameras.main.shake(120, 0.006);
+
+    if (this.hp <= 0) {
+      this.hp = 0;
+      this.showRetryOverlay();
+      return;
+    }
+
+    this.player.setTint(0xffb8c8);
+    const knockback = this.player.x < this.boss.x ? -290 : 290;
+    this.player.setVelocity(forceRespawn ? 0 : knockback, forceRespawn ? 0 : -260);
+    if (forceRespawn) {
+      this.player.setPosition(this.player.x < 480 ? 150 : 810, 486);
+    }
+    this.time.delayedCall(520, () => this.player.clearTint());
   }
 
   private isMatsuriInvincible(time: number): boolean {
@@ -922,11 +998,11 @@ export class BossScene extends Phaser.Scene {
   }
 
   private getBossBodyRect(): Phaser.Geom.Rectangle {
-    return new Phaser.Geom.Rectangle(this.boss.x - 78, this.boss.y - 280, 156, 276);
+    return new Phaser.Geom.Rectangle(this.boss.x - 58, this.boss.y - 208, 116, 204);
   }
 
   private getBossHeadRect(): Phaser.Geom.Rectangle {
-    return new Phaser.Geom.Rectangle(this.boss.x - 58, this.boss.y - 318, 116, 88);
+    return new Phaser.Geom.Rectangle(this.boss.x - 46, this.boss.y - 238, 92, 70);
   }
 
   private showRetryOverlay(): void {
