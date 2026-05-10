@@ -620,7 +620,11 @@ export class BossScene extends Phaser.Scene {
 
   private updateActors(time: number): void {
     this.dinosaurs.getChildren().forEach((dino) => {
-      (dino as Dinosaur).update(time);
+      const dinosaur = dino as Dinosaur;
+      dinosaur.update(time);
+      if (dinosaur.active && (dinosaur.x < -80 || dinosaur.x > 1040)) {
+        dinosaur.destroy();
+      }
     });
     this.projectiles.getChildren().forEach((projectile) => {
       const sprite = projectile as Phaser.Physics.Arcade.Sprite;
@@ -694,10 +698,8 @@ export class BossScene extends Phaser.Scene {
 
   private updateUi(time: number): void {
     const config = this.player.config;
-    const cooldown = Math.max(0, ((this.cooldowns[this.player.activeId] ?? 0) - time) / 1000);
-    const summon = this.player.activeId === "yuri" ? "  頭にも当てられる" : "";
     this.uiText.setText(`ラスボス  ${config.name}（${config.kana}）  スコア ${this.score}`);
-    this.abilityText.setText(`${config.specialName}${summon}${cooldown > 0 ? `  あと ${cooldown.toFixed(1)}秒` : "  OK"}`);
+    this.abilityText.setText(this.getSpecialDisplayName());
     this.specialLabelText.setColor(config.uiColor);
 
     this.uiFx.clear();
@@ -728,6 +730,14 @@ export class BossScene extends Phaser.Scene {
     });
     this.syncTopIcons();
     this.syncIconRow();
+  }
+
+  private getSpecialDisplayName(): string {
+    const config = this.player.config;
+    if (this.player.activeId === "yuri") {
+      return `${characters.yuri.dinosaurName}の${config.specialName}`;
+    }
+    return config.specialName;
   }
 
   private syncTopIcons(): void {
@@ -866,11 +876,12 @@ export class BossScene extends Phaser.Scene {
 
   private summonDinosaur(): void {
     const config = characters.yuri;
+    const direction = this.player.facing < 0 ? -1 : 1;
     const dino = new Dinosaur(
       this,
-      this.player.x + 62,
+      this.player.x + direction * 62,
       this.player.y - 8,
-      1,
+      direction,
       config.dinosaurSpeed ?? 360,
       (config.dinosaurLifetime ?? 2.5) * 1000,
     );

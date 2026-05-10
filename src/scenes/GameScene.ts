@@ -131,11 +131,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.platforms);
     this.physics.add.collider(this.enemies, this.platforms);
     this.physics.add.collider(this.player, this.rocks);
-    this.physics.add.collider(this.player, this.dashWalls, (_, wall) => {
-      if (this.player.activeId === "akari" && this.time.now < this.dashUntil) {
-        this.breakDashWall(wall as Phaser.GameObjects.GameObject);
-      }
-    });
+    this.physics.add.collider(this.player, this.dashWalls);
 
     this.physics.add.overlap(this.player, this.stars, (_, star) => {
       this.collectStar(star as Phaser.GameObjects.GameObject);
@@ -160,14 +156,23 @@ export class GameScene extends Phaser.Scene {
       this.touchEnemy(enemy as Enemy);
     });
     this.physics.add.overlap(this.dinosaurs, this.rocks, (dino, rock) => {
+      if (!this.canDinosaurAffect(dino as Dinosaur, rock as Phaser.GameObjects.GameObject)) {
+        return;
+      }
       this.breakRock(rock as Phaser.GameObjects.GameObject);
       (dino as Dinosaur).destroy();
     });
     this.physics.add.overlap(this.dinosaurs, this.enemies, (dino, enemy) => {
+      if (!this.canDinosaurAffect(dino as Dinosaur, enemy as Phaser.GameObjects.GameObject)) {
+        return;
+      }
       this.popEnemy(enemy as Enemy);
       (dino as Dinosaur).destroy();
     });
-    this.physics.add.overlap(this.dinosaurs, this.hazards, (_, hazard) => {
+    this.physics.add.overlap(this.dinosaurs, this.hazards, (dino, hazard) => {
+      if (!this.canDinosaurAffect(dino as Dinosaur, hazard as Phaser.GameObjects.GameObject)) {
+        return;
+      }
       this.breakHazard(hazard as Phaser.GameObjects.GameObject);
     });
 
@@ -854,10 +859,10 @@ export class GameScene extends Phaser.Scene {
 
   private summonDinosaur(): void {
     const config = characters.yuri;
-    const direction = 1;
+    const direction = this.player.facing < 0 ? -1 : 1;
     const dino = new Dinosaur(
       this,
-      this.player.x + 62,
+      this.player.x + direction * 62,
       this.player.y - 8,
       direction,
       config.dinosaurSpeed ?? 360,
@@ -865,10 +870,10 @@ export class GameScene extends Phaser.Scene {
     );
     this.dinosaurs.add(dino);
     const body = dino.body as Phaser.Physics.Arcade.Body;
-    body.setVelocityX(config.dinosaurSpeed ?? 760);
+    body.setVelocityX((config.dinosaurSpeed ?? 760) * direction);
     body.setVelocityY(0);
     this.spawnStarBurst(dino.x, dino.y - 38, config.color, 8);
-    this.spawnDinosaurChargeTrail(dino.x, dino.y - 38);
+    this.spawnDinosaurChargeTrail(dino.x, dino.y - 38, direction);
   }
 
   private updateActors(time: number): void {
@@ -876,8 +881,39 @@ export class GameScene extends Phaser.Scene {
       (enemy as Enemy).update();
     });
     this.dinosaurs.getChildren().forEach((dino) => {
-      (dino as Dinosaur).update(time);
+      const dinosaur = dino as Dinosaur;
+      dinosaur.update(time);
+      if (dinosaur.active && !this.isObjectInCameraView(dinosaur)) {
+        dinosaur.destroy();
+      }
     });
+  }
+
+  private canDinosaurAffect(dinosaur: Dinosaur, target: Phaser.GameObjects.GameObject): boolean {
+    return this.isObjectInCameraView(dinosaur) && this.isObjectInCameraView(target);
+  }
+
+  private isObjectInCameraView(object: Phaser.GameObjects.GameObject): boolean {
+    const view = this.cameras.main.worldView;
+    const item = object as Phaser.GameObjects.GameObject & {
+      x?: number;
+      y?: number;
+      displayWidth?: number;
+      displayHeight?: number;
+      width?: number;
+      height?: number;
+    };
+    const x = item.x ?? 0;
+    const y = item.y ?? 0;
+    const halfWidth = (item.displayWidth ?? item.width ?? 0) / 2;
+    const halfHeight = (item.displayHeight ?? item.height ?? 0) / 2;
+
+    return (
+      x + halfWidth >= view.left &&
+      x - halfWidth <= view.right &&
+      y + halfHeight >= view.top &&
+      y - halfHeight <= view.bottom
+    );
   }
 
   private updateCheckpoint(): void {
@@ -946,9 +982,7 @@ export class GameScene extends Phaser.Scene {
     const hpText = "♥".repeat(this.hp) + "♡".repeat(Math.max(0, 3 - this.hp));
     this.uiText.setText(`R${this.level.round}/${roundCount} ${config.name}（${config.kana}）  ${hpText}  スコア ${this.score}`);
 
-    const cooldown = Math.max(0, ((this.cooldowns[this.player.activeId] ?? 0) - time) / 1000);
-    const summon = this.player.activeId === "yuri" ? "  右へ突進" : "";
-    this.abilityText.setText(`${config.specialName}${summon}${cooldown > 0 ? `  あと ${cooldown.toFixed(1)}秒` : "  OK"}`);
+    this.abilityText.setText(this.getSpecialDisplayName());
     this.specialLabelText.setColor(config.uiColor);
 
     this.uiFx.clear();
@@ -977,6 +1011,14 @@ export class GameScene extends Phaser.Scene {
     this.uiFx.fillRoundedRect(736, 72, 206, 20, 10);
     this.uiFx.fillStyle(config.color, 0.9);
     this.uiFx.fillRoundedRect(740, 76, 198 * activeRatio, 12, 8);
+  }
+
+  private getSpecialDisplayName(): string {
+    const config = this.player.config;
+    if (this.player.activeId === "yuri") {
+      return `${characters.yuri.dinosaurName}の${config.specialName}`;
+    }
+    return config.specialName;
   }
 
   private syncTopIcons(): void {
@@ -1268,13 +1310,13 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private spawnDinosaurChargeTrail(x: number, y: number): void {
+  private spawnDinosaurChargeTrail(x: number, y: number, direction: -1 | 1): void {
     for (let i = 0; i < 8; i += 1) {
-      const trail = this.add.rectangle(x - i * 18, y + Phaser.Math.Between(-14, 18), 42, 6, 0xff6b32, 0.52);
+      const trail = this.add.rectangle(x - direction * i * 18, y + Phaser.Math.Between(-14, 18), 42, 6, 0xff6b32, 0.52);
       trail.setDepth(16);
       this.tweens.add({
         targets: trail,
-        x: trail.x - 70 - i * 8,
+        x: trail.x - direction * (70 + i * 8),
         alpha: 0,
         duration: 360,
         ease: "Quad.easeOut",

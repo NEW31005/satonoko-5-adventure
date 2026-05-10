@@ -17,14 +17,15 @@ export class Dinosaur extends Phaser.Physics.Arcade.Sprite {
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
+    const normalizedDirection = direction < 0 ? -1 : 1;
     this.expiresAt = scene.time.now + lifetimeMs;
     this.laneY = y;
-    this.chargeSpeed = speed;
+    this.chargeSpeed = Math.abs(speed) * normalizedDirection;
     this.setOrigin(0.5, 1);
     this.setDepth(18);
     this.setDisplaySize(64, 76);
-    this.setFlipX(false);
-    this.setVelocity(speed, 0);
+    this.setFlipX(normalizedDirection < 0);
+    this.setVelocity(this.chargeSpeed, 0);
     this.setAcceleration(0, 0);
     this.setGravityY(0);
     this.play("chibitira-run", true);
