@@ -468,7 +468,7 @@ export class GameScene extends Phaser.Scene {
     this.stageTitleText = this.add
       .text(480, 72, "", {
         fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
-        fontSize: "19px",
+        fontSize: "17px",
         fontStyle: "900",
         color: "#3d332a",
         align: "center",
@@ -1006,6 +1006,8 @@ export class GameScene extends Phaser.Scene {
     const config = this.player.config;
     this.uiText.setText(`${config.name}（${config.kana}）`);
     this.scoreText.setText(`スコア ${this.score}`);
+    const heartHudX = Phaser.Math.Clamp(this.uiText.x + this.uiText.width + 24, 164, 214);
+    this.scoreText.setX(heartHudX + 94);
     this.stageTitleText.setText(`R${this.level.round} ${this.level.title}`);
 
     this.abilityText.setText(this.getSpecialDisplayName());
@@ -1013,7 +1015,7 @@ export class GameScene extends Phaser.Scene {
 
     this.uiFx.clear();
     this.drawTopHud(config.color);
-    this.drawHeartHud(212, 42);
+    this.drawHeartHud(heartHudX, 42);
 
     const abilityBoxWidth = Phaser.Math.Clamp(this.abilityText.width + 24, 190, 360);
     this.uiFx.fillStyle(0xffffff, 0.86);
@@ -1051,19 +1053,15 @@ export class GameScene extends Phaser.Scene {
     this.uiFx.strokeRoundedRect(18, 16, 390, 52, 16);
     this.uiFx.fillStyle(characterColor, 0.92);
     this.uiFx.fillRoundedRect(18, 16, 10, 52, 8);
-    this.uiFx.fillStyle(0xffd84d, 0.9);
-    this.uiFx.fillCircle(388, 45, 11);
-    this.uiFx.lineStyle(2, 0xffffff, 0.95);
-    this.uiFx.strokeCircle(388, 45, 11);
 
     this.uiFx.fillStyle(0x2f3a45, 0.14);
-    this.uiFx.fillRoundedRect(334, 72, 292, 38, 14);
+    this.uiFx.fillRoundedRect(354, 72, 252, 34, 13);
     this.uiFx.fillStyle(0xffffff, 0.88);
-    this.uiFx.fillRoundedRect(330, 66, 292, 38, 14);
+    this.uiFx.fillRoundedRect(350, 66, 252, 34, 13);
     this.uiFx.lineStyle(2, 0x7bc9e8, 0.85);
-    this.uiFx.strokeRoundedRect(330, 66, 292, 38, 14);
+    this.uiFx.strokeRoundedRect(350, 66, 252, 34, 13);
     this.uiFx.fillStyle(0x7bc9e8, 0.22);
-    this.uiFx.fillRoundedRect(342, 74, 268, 20, 10);
+    this.uiFx.fillRoundedRect(362, 74, 228, 18, 9);
   }
 
   private drawHeartHud(x: number, y: number): void {
