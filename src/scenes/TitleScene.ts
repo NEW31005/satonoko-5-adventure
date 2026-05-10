@@ -12,7 +12,6 @@ export class TitleScene extends Phaser.Scene {
     id: DifficultyId;
     box: Phaser.GameObjects.Rectangle;
     label: Phaser.GameObjects.Text;
-    detail: Phaser.GameObjects.Text;
   }> = [];
 
   constructor() {
@@ -139,23 +138,15 @@ export class TitleScene extends Phaser.Scene {
       const config = difficulties[id];
       const x = 300 + index * 180;
       const box = this.add
-        .rectangle(x, 438, 164, 48, 0xffffff, 0.9)
+        .rectangle(x, 438, 164, 44, 0xffffff, 0.9)
         .setStrokeStyle(3, config.color, 0.9)
         .setInteractive({ useHandCursor: true });
       const label = this.add
-        .text(x, 429, config.label, {
+        .text(x, 438, config.label, {
           fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
           fontSize: "18px",
           fontStyle: "900",
           color: "#2d241f",
-        })
-        .setOrigin(0.5);
-      const detail = this.add
-        .text(x, 450, config.description, {
-          fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
-          fontSize: "11px",
-          fontStyle: "700",
-          color: "#5d6470",
         })
         .setOrigin(0.5);
 
@@ -164,7 +155,7 @@ export class TitleScene extends Phaser.Scene {
         this.updateDifficultySelector();
       });
 
-      this.difficultyButtons.push({ id, box, label, detail });
+      this.difficultyButtons.push({ id, box, label });
     });
 
     this.updateDifficultySelector();
@@ -178,13 +169,12 @@ export class TitleScene extends Phaser.Scene {
   }
 
   private updateDifficultySelector(): void {
-    this.difficultyButtons.forEach(({ id, box, label, detail }) => {
+    this.difficultyButtons.forEach(({ id, box, label }) => {
       const config = difficulties[id];
       const selected = id === this.selectedDifficultyId;
       box.setFillStyle(selected ? config.color : 0xffffff, selected ? 0.92 : 0.86);
       box.setStrokeStyle(selected ? 5 : 3, selected ? 0xffffff : config.color, selected ? 1 : 0.9);
       label.setColor(selected ? "#ffffff" : "#2d241f");
-      detail.setColor(selected ? "#ffffff" : "#5d6470");
       label.setScale(selected ? 1.05 : 1);
     });
   }

@@ -482,7 +482,7 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.stageTitleText = this.add
-      .text(536, 72, "", {
+      .text(536, 88, "", {
         fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
         fontSize: "16px",
         fontStyle: "900",
@@ -1076,13 +1076,13 @@ export class GameScene extends Phaser.Scene {
     this.uiFx.fillRoundedRect(18, 16, 10, 52, 8);
 
     this.uiFx.fillStyle(0x2f3a45, 0.14);
-    this.uiFx.fillRoundedRect(424, 72, 232, 32, 12);
+    this.uiFx.fillRoundedRect(424, 88, 232, 32, 12);
     this.uiFx.fillStyle(0xffffff, 0.88);
-    this.uiFx.fillRoundedRect(420, 66, 232, 32, 12);
+    this.uiFx.fillRoundedRect(420, 82, 232, 32, 12);
     this.uiFx.lineStyle(2, 0x7bc9e8, 0.85);
-    this.uiFx.strokeRoundedRect(420, 66, 232, 32, 12);
+    this.uiFx.strokeRoundedRect(420, 82, 232, 32, 12);
     this.uiFx.fillStyle(0x7bc9e8, 0.22);
-    this.uiFx.fillRoundedRect(432, 74, 208, 16, 8);
+    this.uiFx.fillRoundedRect(432, 90, 208, 16, 8);
   }
 
   private drawHeartHud(x: number, y: number): void {
