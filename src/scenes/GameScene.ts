@@ -482,7 +482,7 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.stageTitleText = this.add
-      .text(536, 88, "", {
+      .text(480, 88, "", {
         fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
         fontSize: "16px",
         fontStyle: "900",
@@ -521,7 +521,7 @@ export class GameScene extends Phaser.Scene {
   private createHomeButton(): void {
     const x = 840;
     const y = 114;
-    const width = 126;
+    const width = 158;
     const height = 30;
     const borderColor = 0x7bc9e8;
 
@@ -536,13 +536,13 @@ export class GameScene extends Phaser.Scene {
       .setStrokeStyle(3, borderColor, 0.9);
     const house = this.add.graphics().setDepth(155).setScrollFactor(0);
     house.lineStyle(3, borderColor, 0.95);
-    house.strokeTriangle(x - 49, y - 3, x - 37, y - 13, x - 25, y - 3);
-    house.strokeRect(x - 44, y - 3, 14, 12);
+    house.strokeTriangle(x - 65, y - 3, x - 53, y - 13, x - 41, y - 3);
+    house.strokeRect(x - 60, y - 3, 14, 12);
 
     const label = this.add
-      .text(x + 16, y, "ホーム", {
+      .text(x + 16, y, "タイトルに戻る", {
         fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
-        fontSize: "14px",
+        fontSize: "13px",
         fontStyle: "900",
         color: "#3d332a",
       })
@@ -1143,13 +1143,13 @@ export class GameScene extends Phaser.Scene {
     this.uiFx.fillRoundedRect(18, 16, 10, 52, 8);
 
     this.uiFx.fillStyle(0x2f3a45, 0.14);
-    this.uiFx.fillRoundedRect(424, 88, 232, 32, 12);
+    this.uiFx.fillRoundedRect(368, 88, 232, 32, 12);
     this.uiFx.fillStyle(0xffffff, 0.88);
-    this.uiFx.fillRoundedRect(420, 82, 232, 32, 12);
+    this.uiFx.fillRoundedRect(364, 82, 232, 32, 12);
     this.uiFx.lineStyle(2, 0x7bc9e8, 0.85);
-    this.uiFx.strokeRoundedRect(420, 82, 232, 32, 12);
+    this.uiFx.strokeRoundedRect(364, 82, 232, 32, 12);
     this.uiFx.fillStyle(0x7bc9e8, 0.22);
-    this.uiFx.fillRoundedRect(432, 90, 208, 16, 8);
+    this.uiFx.fillRoundedRect(376, 90, 208, 16, 8);
   }
 
   private drawHeartHud(x: number, y: number): void {
