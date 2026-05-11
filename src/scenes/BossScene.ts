@@ -90,7 +90,7 @@ export class BossScene extends Phaser.Scene {
     this.flightUntil = 0;
     this.invincibleUntil = 0;
     this.cooldowns = {};
-    this.nextOrbAt = this.time.now + 1200;
+    this.nextOrbAt = this.time.now + 2200;
     this.nextBeamAt = this.time.now + 2800;
     this.beamUntil = 0;
     this.beamCharging = false;
@@ -612,7 +612,7 @@ export class BossScene extends Phaser.Scene {
 
     if (time >= this.nextOrbAt && !this.beamRect && !this.beamCharging) {
       this.fireOrbs();
-      this.nextOrbAt = time + Phaser.Math.Between(1300, 1700);
+      this.nextOrbAt = time + Phaser.Math.Between(2900, 3800);
     }
 
     if (time >= this.nextBeamAt) {
