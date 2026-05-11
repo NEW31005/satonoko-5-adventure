@@ -56,6 +56,7 @@ export class BossScene extends Phaser.Scene {
   private nextOrbAt = 0;
   private nextBeamAt = 0;
   private beamRect?: Phaser.GameObjects.Rectangle;
+  private beamVisuals: Phaser.GameObjects.GameObject[] = [];
   private beamUntil = 0;
   private beamCharging = false;
   private isEnding = false;
@@ -627,8 +628,7 @@ export class BossScene extends Phaser.Scene {
     }
 
     if (this.beamRect && time >= this.beamUntil) {
-      this.beamRect.destroy();
-      this.beamRect = undefined;
+      this.clearBeam();
     }
   }
 
@@ -980,18 +980,44 @@ export class BossScene extends Phaser.Scene {
         if (this.isGameOver || this.isEnding || this.hasActiveBossOrbs()) {
           return;
         }
-        this.beamRect = this.add.rectangle(startX, y, 1, 24, 0xff2e9f, 0.78).setDepth(24);
+        const originX = direction < 0 ? 1 : 0;
+        const beamAura = this.add.rectangle(startX, y, 1, 70, 0x8b4de8, 0.12).setDepth(22).setOrigin(originX, 0.5);
+        const beamGlow = this.add.rectangle(startX, y, 1, 48, 0xff4fcb, 0.24).setDepth(23).setOrigin(originX, 0.5);
+        this.beamRect = this.add.rectangle(startX, y, 1, 26, 0xff2e9f, 0.12).setDepth(24).setOrigin(originX, 0.5);
+        const beamCore = this.add.rectangle(startX, y, 1, 10, 0xffffff, 0.96).setDepth(26).setOrigin(originX, 0.5);
+        const topLine = this.add.rectangle(startX, y - 17, 1, 3, 0xffffff, 0.78).setDepth(26).setOrigin(originX, 0.5);
+        const bottomLine = this.add.rectangle(startX, y + 17, 1, 3, 0xffffff, 0.78).setDepth(26).setOrigin(originX, 0.5);
+        const muzzleGlow = this.add.circle(startX, y, 20, 0xff2e9f, 0.72).setDepth(27);
+        muzzleGlow.setStrokeStyle(5, 0xffffff, 0.86);
+
+        this.beamVisuals = [beamAura, beamGlow, beamCore, topLine, bottomLine, muzzleGlow];
         this.beamRect.setOrigin(direction < 0 ? 1 : 0, 0.5);
-        this.beamRect.setStrokeStyle(4, 0xffffff, 0.9);
+        this.beamRect.setStrokeStyle(3, 0xffe5fb, 0.82);
         this.beamUntil = this.time.now + 1150;
         this.tweens.add({
-          targets: this.beamRect,
+          targets: [beamAura, beamGlow, this.beamRect, beamCore, topLine, bottomLine],
           displayWidth: width,
-          duration: 520,
+          duration: 620,
           ease: "Quad.easeOut",
+        });
+        this.tweens.add({
+          targets: muzzleGlow,
+          scale: 1.32,
+          alpha: 0.38,
+          duration: 160,
+          yoyo: true,
+          repeat: 4,
+          ease: "Sine.easeInOut",
         });
       },
     });
+  }
+
+  private clearBeam(): void {
+    this.beamRect?.destroy();
+    this.beamRect = undefined;
+    this.beamVisuals.forEach((visual) => visual.destroy());
+    this.beamVisuals = [];
   }
 
   private summonDinosaur(): void {
@@ -1147,7 +1173,7 @@ export class BossScene extends Phaser.Scene {
     this.isEnding = true;
     this.player.setVelocity(0, 0);
     this.projectiles.clear(true, true);
-    this.beamRect?.destroy();
+    this.clearBeam();
     this.spawnStarBurst(this.boss.x, this.boss.y - 210, 0xffd84d, 24);
     this.cameras.main.fadeOut(620, 255, 255, 255);
     this.time.delayedCall(650, () => {
