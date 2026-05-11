@@ -45,7 +45,8 @@ export class BossScene extends Phaser.Scene {
   private hp = difficulties[defaultDifficultyId].maxHp;
   private maxHp = difficulties[defaultDifficultyId].maxHp;
   private bossHp = 45;
-  private readonly bossMaxHp = 45;
+  private bossMaxHp = 45;
+  private readonly bossBaseMaxHp = 45;
   private bossInvulnerableUntil = 0;
   private bossTouchSafeUntil = 0;
   private bossStompChain = 0;
@@ -58,6 +59,7 @@ export class BossScene extends Phaser.Scene {
   private cooldowns: Partial<Record<CharacterId, number>> = {};
   private nextOrbAt = 0;
   private nextBeamAt = 0;
+  private orbBurstUntil = 0;
   private beamRect?: Phaser.GameObjects.Rectangle;
   private beamVisuals: Phaser.GameObjects.GameObject[] = [];
   private beamUntil = 0;
@@ -88,6 +90,7 @@ export class BossScene extends Phaser.Scene {
   create(): void {
     this.characterIndex = 0;
     this.hp = this.maxHp;
+    this.bossMaxHp = this.getBossMaxHp();
     this.bossHp = this.bossMaxHp;
     this.bossInvulnerableUntil = 0;
     this.bossTouchSafeUntil = 0;
@@ -101,6 +104,7 @@ export class BossScene extends Phaser.Scene {
     this.cooldowns = {};
     this.nextOrbAt = this.time.now + 2200;
     this.nextBeamAt = this.time.now + 2800;
+    this.orbBurstUntil = 0;
     this.beamUntil = 0;
     this.beamCharging = false;
     this.isEnding = false;
@@ -713,13 +717,13 @@ export class BossScene extends Phaser.Scene {
     this.boss.rotation = Math.sin(time / 850) * 0.018;
     this.syncBossHitZone();
 
-    if (time >= this.nextOrbAt && !this.beamRect && !this.beamCharging) {
+    if (time >= this.nextOrbAt && !this.beamRect && !this.beamCharging && time >= this.orbBurstUntil) {
       this.fireOrbs();
-      this.nextOrbAt = time + Phaser.Math.Between(2900, 3800);
+      this.nextOrbAt = this.orbBurstUntil + Phaser.Math.Between(2600, 3600);
     }
 
     if (time >= this.nextBeamAt) {
-      if (this.hasActiveBossOrbs()) {
+      if (this.isOrbBurstActive(time)) {
         this.nextBeamAt = time + 700;
       } else {
         this.fireBeam();
@@ -774,6 +778,10 @@ export class BossScene extends Phaser.Scene {
 
   private hasActiveBossOrbs(): boolean {
     return this.projectiles.getChildren().some((projectile) => projectile.active);
+  }
+
+  private isOrbBurstActive(time = this.time.now): boolean {
+    return time < this.orbBurstUntil || this.hasActiveBossOrbs();
   }
 
   private updateBossTouch(time: number): void {
@@ -861,23 +869,26 @@ export class BossScene extends Phaser.Scene {
 
     this.uiFx.clear();
     this.uiFx.fillStyle(0x2f3a45, 0.16);
-    this.uiFx.fillRoundedRect(22, 22, 380, 78, 16);
+    this.uiFx.fillRoundedRect(22, 22, 290, 66, 16);
     this.uiFx.fillStyle(0xffffff, 0.92);
-    this.uiFx.fillRoundedRect(18, 16, 380, 78, 16);
+    this.uiFx.fillRoundedRect(18, 16, 290, 66, 16);
     this.uiFx.lineStyle(3, config.color, 0.9);
-    this.uiFx.strokeRoundedRect(18, 16, 380, 78, 16);
+    this.uiFx.strokeRoundedRect(18, 16, 290, 66, 16);
     this.uiFx.fillStyle(config.color, 0.92);
-    this.uiFx.fillRoundedRect(18, 16, 10, 78, 8);
-    this.drawHeartHud(52, 72);
+    this.uiFx.fillRoundedRect(18, 16, 10, 66, 8);
+    this.drawHeartHud(50, 62);
 
     this.uiFx.fillStyle(0xffffff, 0.9);
-    this.uiFx.fillRoundedRect(420, 18, 320, 26, 13);
+    this.uiFx.fillRoundedRect(330, 18, 300, 26, 13);
     this.uiFx.fillStyle(0x2a053d, 0.98);
-    this.uiFx.fillRoundedRect(426, 24, 308, 14, 8);
-    this.uiFx.fillStyle(0xff4f9d, 0.98);
-    this.uiFx.fillRoundedRect(426, 24, 308 * (this.bossHp / this.bossMaxHp), 14, 8);
+    this.uiFx.fillRoundedRect(336, 24, 288, 14, 8);
+    this.uiFx.fillStyle(this.getBossGaugeColor(), 0.98);
+    this.uiFx.fillRoundedRect(336, 24, 288 * this.getBossGaugeRatio(), 14, 8);
     this.uiFx.lineStyle(3, 0x8b4de8, 0.95);
-    this.uiFx.strokeRoundedRect(420, 18, 320, 26, 13);
+    this.uiFx.strokeRoundedRect(330, 18, 300, 26, 13);
+    if (this.difficultyId === "hard") {
+      this.drawBossLapPips(646, 31);
+    }
 
     const abilityBoxWidth = Phaser.Math.Clamp(this.abilityText.width + 30, 150, 340);
     this.uiFx.fillStyle(0xffffff, 0.86);
@@ -897,6 +908,38 @@ export class BossScene extends Phaser.Scene {
     });
     this.syncTopIcons();
     this.syncIconRow();
+  }
+
+  private getBossMaxHp(): number {
+    return this.difficultyId === "hard" ? this.bossBaseMaxHp * 2 : this.bossBaseMaxHp;
+  }
+
+  private getBossGaugeRatio(): number {
+    if (this.difficultyId !== "hard") {
+      return Phaser.Math.Clamp(this.bossHp / this.bossMaxHp, 0, 1);
+    }
+
+    const lapHp = this.bossHp > this.bossBaseMaxHp ? this.bossHp - this.bossBaseMaxHp : this.bossHp;
+    return Phaser.Math.Clamp(lapHp / this.bossBaseMaxHp, 0, 1);
+  }
+
+  private getBossGaugeColor(): number {
+    if (this.difficultyId === "hard" && this.bossHp <= this.bossBaseMaxHp) {
+      return 0xff8b4d;
+    }
+    return 0xff4f9d;
+  }
+
+  private drawBossLapPips(x: number, y: number): void {
+    const onFirstLap = this.bossHp > this.bossBaseMaxHp;
+    this.uiFx.fillStyle(onFirstLap ? 0xff4f9d : 0xffffff, onFirstLap ? 0.96 : 0.72);
+    this.uiFx.fillCircle(x, y, 5);
+    this.uiFx.lineStyle(2, 0xff4f9d, 0.9);
+    this.uiFx.strokeCircle(x, y, 6);
+    this.uiFx.fillStyle(!onFirstLap ? 0xff8b4d : 0xffffff, !onFirstLap ? 0.96 : 0.72);
+    this.uiFx.fillCircle(x + 16, y, 5);
+    this.uiFx.lineStyle(2, 0xff8b4d, 0.9);
+    this.uiFx.strokeCircle(x + 16, y, 6);
   }
 
   private drawHeartHud(x: number, y: number): void {
@@ -1032,6 +1075,30 @@ export class BossScene extends Phaser.Scene {
   }
 
   private fireOrbs(): void {
+    const burstCount = this.getOrbBurstCount();
+    const burstDelay = 320;
+    this.orbBurstUntil = this.time.now + (burstCount - 1) * burstDelay + 560;
+    for (let burst = 0; burst < burstCount; burst += 1) {
+      this.time.delayedCall(burst * burstDelay, () => {
+        if (this.isGameOver || this.isEnding || this.beamRect || this.beamCharging) {
+          return;
+        }
+        this.fireOrbVolley();
+      });
+    }
+  }
+
+  private getOrbBurstCount(): number {
+    if (this.difficultyId === "easy") {
+      return 1;
+    }
+    if (this.difficultyId === "hard") {
+      return 3;
+    }
+    return 2;
+  }
+
+  private fireOrbVolley(): void {
     const direction = this.player.x < this.boss.x ? -1 : 1;
     const startX = this.boss.x + direction * 62;
     const startY = this.boss.y - 164;
@@ -1049,7 +1116,7 @@ export class BossScene extends Phaser.Scene {
   }
 
   private fireBeam(): void {
-    if (this.beamRect || this.beamCharging || this.hasActiveBossOrbs()) {
+    if (this.beamRect || this.beamCharging || this.isOrbBurstActive()) {
       return;
     }
 
@@ -1078,7 +1145,7 @@ export class BossScene extends Phaser.Scene {
         charge.destroy();
         this.boss.clearTint();
         this.beamCharging = false;
-        if (this.isGameOver || this.isEnding || this.hasActiveBossOrbs()) {
+        if (this.isGameOver || this.isEnding || this.isOrbBurstActive()) {
           return;
         }
         const originX = direction < 0 ? 1 : 0;
