@@ -48,6 +48,9 @@ export class BossScene extends Phaser.Scene {
   private readonly bossMaxHp = 45;
   private bossInvulnerableUntil = 0;
   private bossTouchSafeUntil = 0;
+  private bossStompChain = 0;
+  private bossEvadeTargetX?: number;
+  private bossEvadeDirection = -1;
   private damageLockUntil = 0;
   private dashUntil = 0;
   private flightUntil = 0;
@@ -88,6 +91,9 @@ export class BossScene extends Phaser.Scene {
     this.bossHp = this.bossMaxHp;
     this.bossInvulnerableUntil = 0;
     this.bossTouchSafeUntil = 0;
+    this.bossStompChain = 0;
+    this.bossEvadeTargetX = undefined;
+    this.bossEvadeDirection = -1;
     this.damageLockUntil = 0;
     this.dashUntil = 0;
     this.flightUntil = 0;
@@ -603,10 +609,36 @@ export class BossScene extends Phaser.Scene {
   }
 
   private updateBoss(time: number, delta: number): void {
+    if (this.bossEvadeTargetX !== undefined) {
+      const step = 430 * (delta / 1000) * this.bossEvadeDirection;
+      const nextX = this.boss.x + step;
+      const reached =
+        (this.bossEvadeDirection < 0 && nextX <= this.bossEvadeTargetX) ||
+        (this.bossEvadeDirection > 0 && nextX >= this.bossEvadeTargetX);
+
+      this.boss.x = reached ? this.bossEvadeTargetX : Phaser.Math.Clamp(nextX, 190, 820);
+      this.boss.y = 508 + Math.sin(time / 120) * 7;
+      this.boss.setFlipX(this.bossEvadeDirection > 0);
+      this.boss.rotation = Math.sin(time / 90) * 0.04;
+      this.syncBossHitZone();
+
+      if (reached) {
+        this.bossEvadeTargetX = undefined;
+        this.bossStompChain = 0;
+        this.bossTouchSafeUntil = time + 360;
+        this.nextOrbAt = time + 1200;
+        this.nextBeamAt = time + 1900;
+      }
+      return;
+    }
+
     const sideToPlayer = this.player.x < this.boss.x ? -1 : 1;
     const distance = 190 + Math.sin(time / 820) * 70;
     const targetX = Phaser.Math.Clamp(this.player.x - sideToPlayer * distance, 210, 800);
     const speed = Phaser.Math.Clamp((targetX - this.boss.x) * 0.55, -92, 92);
+    if (Math.abs(speed) > 4) {
+      this.bossEvadeDirection = speed > 0 ? 1 : -1;
+    }
     this.boss.x = Phaser.Math.Clamp(this.boss.x + speed * (delta / 1000), 190, 820);
     this.boss.y = 508 + Math.sin(time / 560) * 5;
     this.boss.setFlipX(sideToPlayer > 0);
@@ -704,6 +736,7 @@ export class BossScene extends Phaser.Scene {
 
     if (isStomp) {
       this.damageBoss(3, this.player.x, this.player.y - this.player.displayHeight);
+      this.registerBossStomp(time);
       this.bossTouchSafeUntil = time + 520;
       this.player.setVelocityY(-650);
       return;
@@ -1050,6 +1083,33 @@ export class BossScene extends Phaser.Scene {
     if (this.bossHp <= 0) {
       this.clearBoss();
     }
+  }
+
+  private registerBossStomp(time: number): void {
+    if (this.isEnding || this.bossHp <= 0 || this.bossEvadeTargetX !== undefined) {
+      return;
+    }
+
+    this.bossStompChain += 1;
+    if (this.bossStompChain < 2) {
+      return;
+    }
+
+    const wallX =
+      this.boss.x < 450
+        ? 820
+        : this.boss.x > 510
+          ? 190
+          : this.bossEvadeDirection >= 0
+            ? 820
+            : 190;
+
+    this.bossEvadeTargetX = wallX;
+    this.bossEvadeDirection = wallX > this.boss.x ? 1 : -1;
+    this.bossInvulnerableUntil = time + 900;
+    this.bossTouchSafeUntil = time + 900;
+    this.clearBeam();
+    this.spawnRing(this.boss.x, this.boss.y - 150, 0xff70c7);
   }
 
   private defeatPlayer(source?: Phaser.GameObjects.GameObject): void {
