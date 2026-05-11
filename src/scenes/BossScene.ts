@@ -47,6 +47,7 @@ export class BossScene extends Phaser.Scene {
   private bossHp = 45;
   private readonly bossMaxHp = 45;
   private bossInvulnerableUntil = 0;
+  private bossTouchSafeUntil = 0;
   private damageLockUntil = 0;
   private dashUntil = 0;
   private flightUntil = 0;
@@ -85,6 +86,7 @@ export class BossScene extends Phaser.Scene {
     this.hp = this.maxHp;
     this.bossHp = this.bossMaxHp;
     this.bossInvulnerableUntil = 0;
+    this.bossTouchSafeUntil = 0;
     this.damageLockUntil = 0;
     this.dashUntil = 0;
     this.flightUntil = 0;
@@ -675,6 +677,10 @@ export class BossScene extends Phaser.Scene {
   }
 
   private updateBossTouch(time: number): void {
+    if (time < this.bossTouchSafeUntil) {
+      return;
+    }
+
     const playerBounds = this.player.getBounds();
     const bodyRect = this.getBossBodyRect();
     if (!Phaser.Geom.Intersects.RectangleToRectangle(playerBounds, bodyRect)) {
@@ -698,6 +704,7 @@ export class BossScene extends Phaser.Scene {
 
     if (isStomp) {
       this.damageBoss(3, this.player.x, this.player.y - this.player.displayHeight);
+      this.bossTouchSafeUntil = time + 520;
       this.player.setVelocityY(-650);
       return;
     }
