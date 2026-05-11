@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "firebase:rules": "npx firebase-tools deploy --only firestore:rules"
   },
   "dependencies": {
     "phaser": "^3.90.0"

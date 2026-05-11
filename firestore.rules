@@ -1,0 +1,56 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /satonokoRoundRankings/{entryId} {
+      allow read: if true;
+      allow create: if isValidRoundRanking();
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+
+  function isValidRoundRanking() {
+    let data = request.resource.data;
+    return data.keys().hasOnly([
+        "id",
+        "dateKey",
+        "playerName",
+        "difficulty",
+        "round",
+        "score",
+        "coins",
+        "timeMs",
+        "points",
+        "createdAt"
+      ])
+      && data.id is string
+      && data.id.size() >= 8
+      && data.id.size() <= 40
+      && data.dateKey is string
+      && data.dateKey.matches("^\\d{4}-\\d{2}-\\d{2}$")
+      && data.playerName is string
+      && data.playerName.size() >= 1
+      && data.playerName.size() <= 10
+      && data.difficulty in ["easy", "normal", "hard"]
+      && data.round is int
+      && data.round >= 1
+      && data.round <= 5
+      && data.score is int
+      && data.score >= 0
+      && data.score <= 100000
+      && data.coins is int
+      && data.coins >= 0
+      && data.coins <= 500
+      && data.timeMs is int
+      && data.timeMs >= 0
+      && data.timeMs <= 3600000
+      && data.points is int
+      && data.points >= 0
+      && data.points <= 200000
+      && data.createdAt is timestamp;
+  }
+}
