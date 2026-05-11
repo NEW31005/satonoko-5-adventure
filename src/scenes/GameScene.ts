@@ -522,18 +522,18 @@ export class GameScene extends Phaser.Scene {
 
     this.createCharacterIconButtons();
 
-    this.addHoldButton(86, 484, "JUMP", 0xffd84d, () => {
+    this.addHoldButton(86, 462, "JUMP", 0xffd84d, () => {
       this.virtualControls.jumpHeld = true;
       this.virtualControls.jumpQueued = true;
     }, () => {
       this.virtualControls.jumpHeld = false;
     }, 78, 78, "#3a2c13", "15px");
 
-    this.addTapButton(206, 484, "SPECIAL", 0x9b5cff, 0xffffff, () => {
+    this.addTapButton(206, 462, "SPECIAL", 0x9b5cff, 0xffffff, () => {
       this.useSpecial();
     }, 78, "12px");
 
-    this.addMovePad(820, 488);
+    this.addMovePad(820, 466);
   }
 
   private showRoundIntro(): void {
