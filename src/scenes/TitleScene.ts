@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { characterOrder, characters } from "../data/characters";
 import { defaultDifficultyId, difficulties, DifficultyId } from "../data/difficulty";
+import { getStoredPlayerName, saveStoredPlayerName } from "../data/ranking";
 
 const assetPath = `${import.meta.env.BASE_URL}assets/characters`;
 const bossAssetPath = `${import.meta.env.BASE_URL}assets/boss`;
@@ -8,6 +9,8 @@ const enemyAssetPath = `${import.meta.env.BASE_URL}assets/enemies`;
 
 export class TitleScene extends Phaser.Scene {
   private selectedDifficultyId: DifficultyId = defaultDifficultyId;
+  private playerName = "ゲスト";
+  private nameText?: Phaser.GameObjects.Text;
   private difficultyButtons: Array<{
     id: DifficultyId;
     box: Phaser.GameObjects.Rectangle;
@@ -48,6 +51,7 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.playerName = getStoredPlayerName();
     this.cameras.main.setBackgroundColor("#f9fdff");
     this.addBackground();
 
@@ -86,6 +90,7 @@ export class TitleScene extends Phaser.Scene {
     this.add.image(480, 310, "lineupTitle").setDisplaySize(760, 380).setAlpha(0.98);
 
     this.createDifficultySelector();
+    this.createNameInput();
 
     const start = this.add
       .text(370, 504, "冒険スタート", {
@@ -119,13 +124,14 @@ export class TitleScene extends Phaser.Scene {
     });
 
     const startGame = () => {
-      this.scene.start("GameScene", { difficulty: this.selectedDifficultyId });
+      this.scene.start("GameScene", { difficulty: this.selectedDifficultyId, playerName: this.playerName });
     };
     const startBoss = () => {
       this.scene.start("BossScene", {
         score: 0,
         stars: 0,
         difficulty: this.selectedDifficultyId,
+        playerName: this.playerName,
       });
     };
 
@@ -137,6 +143,40 @@ export class TitleScene extends Phaser.Scene {
     this.input.keyboard?.once("keydown-SPACE", startGame);
     start.setInteractive({ useHandCursor: true }).on("pointerdown", startGame);
     bossChallenge.setInteractive({ useHandCursor: true }).on("pointerdown", startBoss);
+  }
+
+  private createNameInput(): void {
+    const x = 800;
+    const y = 398;
+    const box = this.add
+      .rectangle(x, y, 250, 34, 0xffffff, 0.88)
+      .setStrokeStyle(3, 0x7bc9e8, 0.95)
+      .setInteractive({ useHandCursor: true });
+    this.nameText = this.add
+      .text(x, y, "", {
+        fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
+        fontSize: "16px",
+        fontStyle: "900",
+        color: "#2d241f",
+      })
+      .setOrigin(0.5);
+
+    const openNamePrompt = () => {
+      const input = window.prompt("ランキングにのせる名前を入力してね", this.playerName);
+      if (input === null) {
+        return;
+      }
+      this.playerName = saveStoredPlayerName(input);
+      this.updateNameText();
+    };
+
+    box.on("pointerdown", openNamePrompt);
+    this.nameText.setInteractive({ useHandCursor: true }).on("pointerdown", openNamePrompt);
+    this.updateNameText();
+  }
+
+  private updateNameText(): void {
+    this.nameText?.setText(`なまえ  ${this.playerName}`);
   }
 
   private createDifficultySelector(): void {

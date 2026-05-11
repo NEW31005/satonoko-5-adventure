@@ -1,7 +1,14 @@
 import Phaser from "phaser";
 import { characterOrder, characters, CharacterId } from "../data/characters";
 import { defaultDifficultyId, DifficultyConfig, DifficultyId, difficulties, resolveDifficulty } from "../data/difficulty";
-import { levelData, RectSpec, roundCount, RoundData, rounds } from "../data/levelData";
+import { levelData, PointSpec, RectSpec, roundCount, RoundData, rounds } from "../data/levelData";
+import {
+  calculateRoundPoints,
+  formatTime,
+  getStoredPlayerName,
+  SavedRoundRanking,
+  submitWorldRoundRanking,
+} from "../data/ranking";
 import { Dinosaur } from "../objects/Dinosaur";
 import { Enemy } from "../objects/Enemy";
 import { Player } from "../objects/Player";
@@ -40,6 +47,7 @@ export class GameScene extends Phaser.Scene {
   private uiFx!: Phaser.GameObjects.Graphics;
   private uiText!: Phaser.GameObjects.Text;
   private scoreText!: Phaser.GameObjects.Text;
+  private timeText!: Phaser.GameObjects.Text;
   private stageTitleText!: Phaser.GameObjects.Text;
   private specialLabelText!: Phaser.GameObjects.Text;
   private abilityText!: Phaser.GameObjects.Text;
@@ -56,6 +64,9 @@ export class GameScene extends Phaser.Scene {
   private maxHp = difficulties[defaultDifficultyId].maxHp;
   private difficulty: DifficultyConfig = difficulties[defaultDifficultyId];
   private difficultyId: DifficultyId = defaultDifficultyId;
+  private playerName = "ゲスト";
+  private roundStartTime = 0;
+  private roundElapsedMs = 0;
   private checkpoint = { ...levelData.checkpoint };
   private damageLockUntil = 0;
   private dashUntil = 0;
@@ -78,7 +89,7 @@ export class GameScene extends Phaser.Scene {
     super("GameScene");
   }
 
-  init(data?: { roundIndex?: number; score?: number; stars?: number; difficulty?: DifficultyId }): void {
+  init(data?: { roundIndex?: number; score?: number; stars?: number; difficulty?: DifficultyId; playerName?: string }): void {
     this.currentRoundIndex = Phaser.Math.Clamp(data?.roundIndex ?? 0, 0, roundCount - 1);
     this.level = rounds[this.currentRoundIndex] ?? rounds[0];
     this.roundStartScore = data?.score ?? 0;
@@ -86,12 +97,15 @@ export class GameScene extends Phaser.Scene {
     this.difficulty = resolveDifficulty(data?.difficulty);
     this.difficultyId = this.difficulty.id;
     this.maxHp = this.difficulty.maxHp;
+    this.playerName = data?.playerName ?? getStoredPlayerName();
   }
 
   create(): void {
     this.characterIndex = 0;
     this.score = this.roundStartScore;
     this.starsCollected = this.roundStartStars;
+    this.roundStartTime = this.time.now;
+    this.roundElapsedMs = 0;
     this.hp = this.maxHp;
     this.checkpoint = { ...this.level.checkpoint };
     this.damageLockUntil = 0;
@@ -238,48 +252,68 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createGeneratedTextures(): void {
-    if (this.textures.exists("star")) {
-      return;
+    if (!this.textures.exists("star")) {
+      const star = this.add.graphics();
+      star.fillStyle(0xffd44d, 1);
+      star.lineStyle(3, 0xffffff, 1);
+      const points: Phaser.Math.Vector2[] = [];
+      for (let i = 0; i < 10; i += 1) {
+        const angle = -Math.PI / 2 + (i * Math.PI) / 5;
+        const radius = i % 2 === 0 ? 16 : 7;
+        points.push(new Phaser.Math.Vector2(18 + Math.cos(angle) * radius, 18 + Math.sin(angle) * radius));
+      }
+      star.fillPoints(points, true);
+      star.strokePoints(points, true);
+      star.generateTexture("star", 36, 36);
+      star.destroy();
     }
 
-    const star = this.add.graphics();
-    star.fillStyle(0xffd44d, 1);
-    star.lineStyle(3, 0xffffff, 1);
-    const points: Phaser.Math.Vector2[] = [];
-    for (let i = 0; i < 10; i += 1) {
-      const angle = -Math.PI / 2 + (i * Math.PI) / 5;
-      const radius = i % 2 === 0 ? 16 : 7;
-      points.push(new Phaser.Math.Vector2(18 + Math.cos(angle) * radius, 18 + Math.sin(angle) * radius));
+    if (!this.textures.exists("coin")) {
+      const coin = this.add.graphics();
+      coin.fillStyle(0xffd84d, 1);
+      coin.fillCircle(18, 18, 15);
+      coin.fillStyle(0xfff3a8, 0.95);
+      coin.fillCircle(14, 13, 6);
+      coin.lineStyle(3, 0xffffff, 0.95);
+      coin.strokeCircle(18, 18, 15);
+      coin.lineStyle(2, 0xdca219, 0.85);
+      coin.strokeCircle(18, 18, 9);
+      coin.generateTexture("coin", 36, 36);
+      coin.destroy();
     }
-    star.fillPoints(points, true);
-    star.strokePoints(points, true);
-    star.generateTexture("star", 36, 36);
-    star.destroy();
 
-    const heart = this.add.graphics();
-    heart.fillStyle(0xff5d80, 1);
-    heart.fillCircle(13, 13, 8);
-    heart.fillCircle(23, 13, 8);
-    heart.fillTriangle(6, 18, 30, 18, 18, 33);
-    heart.lineStyle(3, 0xffffff, 1);
-    heart.strokeCircle(13, 13, 8);
-    heart.strokeCircle(23, 13, 8);
-    heart.generateTexture("heart", 36, 36);
-    heart.destroy();
+    if (!this.textures.exists("heart")) {
+      const heart = this.add.graphics();
+      heart.fillStyle(0xff4d78, 1);
+      heart.fillCircle(13, 13, 8);
+      heart.fillCircle(23, 13, 8);
+      heart.fillTriangle(5, 17, 31, 17, 18, 34);
+      heart.fillStyle(0xffffff, 0.42);
+      heart.fillCircle(12, 10, 3);
+      heart.lineStyle(3, 0xffffff, 1);
+      heart.strokeCircle(13, 13, 8);
+      heart.strokeCircle(23, 13, 8);
+      heart.lineStyle(2, 0xd72f5f, 0.95);
+      heart.strokeTriangle(5, 17, 31, 17, 18, 34);
+      heart.generateTexture("heart", 36, 38);
+      heart.destroy();
+    }
 
-    const slime = this.add.graphics();
-    slime.fillStyle(0x8bdc83, 1);
-    slime.fillEllipse(34, 34, 58, 38);
-    slime.fillStyle(0xffffff, 1);
-    slime.fillCircle(24, 27, 6);
-    slime.fillCircle(43, 27, 6);
-    slime.fillStyle(0x243029, 1);
-    slime.fillCircle(25, 28, 2);
-    slime.fillCircle(42, 28, 2);
-    slime.lineStyle(4, 0x4da85c, 1);
-    slime.strokeEllipse(34, 34, 58, 38);
-    slime.generateTexture("slime", 68, 58);
-    slime.destroy();
+    if (!this.textures.exists("slime")) {
+      const slime = this.add.graphics();
+      slime.fillStyle(0x8bdc83, 1);
+      slime.fillEllipse(34, 34, 58, 38);
+      slime.fillStyle(0xffffff, 1);
+      slime.fillCircle(24, 27, 6);
+      slime.fillCircle(43, 27, 6);
+      slime.fillStyle(0x243029, 1);
+      slime.fillCircle(25, 28, 2);
+      slime.fillCircle(42, 28, 2);
+      slime.lineStyle(4, 0x4da85c, 1);
+      slime.strokeEllipse(34, 34, 58, 38);
+      slime.generateTexture("slime", 68, 58);
+      slime.destroy();
+    }
   }
 
   private createSpriteAnimations(): void {
@@ -364,8 +398,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createCollectibles(): void {
-    this.level.stars.forEach(({ x, y }) => {
-      const star = this.stars.create(x, y, "star") as Phaser.Physics.Arcade.Sprite;
+    this.getCoinPositions().forEach(({ x, y }) => {
+      const star = this.stars.create(x, y, "coin") as Phaser.Physics.Arcade.Sprite;
       star.setDisplaySize(30, 30);
       star.setDepth(9);
       star.refreshBody();
@@ -385,6 +419,31 @@ export class GameScene extends Phaser.Scene {
       heart.setDepth(9);
       heart.refreshBody();
     });
+  }
+
+  private getCoinPositions(): PointSpec[] {
+    const coins: PointSpec[] = [...this.level.stars];
+    this.level.platforms.forEach((platform) => {
+      if (platform.width < 260) {
+        return;
+      }
+      const count = Phaser.Math.Clamp(Math.floor(platform.width / 260), 1, 4);
+      for (let index = 0; index < count; index += 1) {
+        const x = platform.x + ((index + 1) * platform.width) / (count + 1);
+        if (x < 210 || x > this.level.goal.x - 80) {
+          continue;
+        }
+        coins.push({ x, y: platform.y - 54 - (index % 2) * 18 });
+      }
+    });
+
+    return coins.reduce<PointSpec[]>((unique, coin) => {
+      const close = unique.some((item) => Phaser.Math.Distance.Between(item.x, item.y, coin.x, coin.y) < 54);
+      if (!close) {
+        unique.push(coin);
+      }
+      return unique;
+    }, []);
   }
 
   private createHazards(): void {
@@ -479,6 +538,19 @@ export class GameScene extends Phaser.Scene {
       })
       .setShadow(0, 2, "rgba(255,255,255,0.95)", 1, true, true)
       .setDepth(101)
+      .setScrollFactor(0);
+
+    this.timeText = this.add
+      .text(480, 120, "", {
+        fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
+        fontSize: "13px",
+        fontStyle: "900",
+        color: "#3d332a",
+        align: "center",
+      })
+      .setOrigin(0.5, 0)
+      .setShadow(0, 2, "rgba(255,255,255,0.95)", 1, true, true)
+      .setDepth(102)
       .setScrollFactor(0);
 
     this.stageTitleText = this.add
@@ -1038,6 +1110,7 @@ export class GameScene extends Phaser.Scene {
       score: this.roundStartScore,
       stars: this.roundStartStars,
       difficulty: this.difficultyId,
+      playerName: this.playerName,
     });
   }
 
@@ -1048,6 +1121,7 @@ export class GameScene extends Phaser.Scene {
         score: this.score,
         stars: this.starsCollected,
         difficulty: this.difficultyId,
+        playerName: this.playerName,
       });
       return;
     }
@@ -1057,6 +1131,7 @@ export class GameScene extends Phaser.Scene {
       score: this.score,
       stars: this.starsCollected,
       difficulty: this.difficultyId,
+      playerName: this.playerName,
     });
   }
 
@@ -1096,6 +1171,10 @@ export class GameScene extends Phaser.Scene {
     const heartSpacing = this.getHeartSpacing();
     this.scoreText.setX(heartHudX + this.maxHp * heartSpacing + 8);
     this.stageTitleText.setText(`R${this.level.round} ${this.level.title}`);
+    if (!this.isClearing) {
+      this.roundElapsedMs = Math.max(0, time - this.roundStartTime);
+    }
+    this.timeText.setText(`TIME ${formatTime(this.roundElapsedMs)}`);
 
     this.abilityText.setText(this.getSpecialDisplayName());
     this.specialLabelText.setColor(config.uiColor);
@@ -1150,6 +1229,13 @@ export class GameScene extends Phaser.Scene {
     this.uiFx.strokeRoundedRect(364, 82, 232, 32, 12);
     this.uiFx.fillStyle(0x7bc9e8, 0.22);
     this.uiFx.fillRoundedRect(376, 90, 208, 16, 8);
+
+    this.uiFx.fillStyle(0x2f3a45, 0.12);
+    this.uiFx.fillRoundedRect(414, 123, 132, 22, 10);
+    this.uiFx.fillStyle(0xffffff, 0.82);
+    this.uiFx.fillRoundedRect(410, 118, 132, 22, 10);
+    this.uiFx.lineStyle(2, 0x7bc9e8, 0.72);
+    this.uiFx.strokeRoundedRect(410, 118, 132, 22, 10);
   }
 
   private drawHeartHud(x: number, y: number): void {
@@ -1422,7 +1508,7 @@ export class GameScene extends Phaser.Scene {
   private popEnemy(enemy: Enemy): void {
     this.spawnStarBurst(enemy.x, enemy.y - 48, 0x78b957, 7);
     enemy.destroy();
-    this.score += 20;
+    this.score += 10;
   }
 
   private clearStage(): void {
@@ -1431,24 +1517,123 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.isClearing = true;
+    this.roundElapsedMs = Math.max(0, this.time.now - this.roundStartTime);
     this.player.setVelocity(0, 0);
-    const roundText = this.add
-      .text(480, 232, this.currentRoundIndex + 1 >= roundCount ? "ぜんぶクリア！" : `ラウンド${this.level.round}クリア！`, {
+    this.physics.pause();
+
+    const roundScore = this.score - this.roundStartScore;
+    const roundCoins = this.starsCollected - this.roundStartStars;
+    const points = calculateRoundPoints(roundScore, roundCoins, this.roundElapsedMs);
+    void this.showRoundRanking(roundScore, roundCoins, points);
+  }
+
+  private async showRoundRanking(roundScore: number, roundCoins: number, points: number): Promise<void> {
+    let ranking: SavedRoundRanking | undefined;
+    try {
+      ranking = await submitWorldRoundRanking({
+        playerName: this.playerName,
+        round: this.level.round,
+        difficulty: this.difficultyId,
+        score: roundScore,
+        coins: roundCoins,
+        timeMs: Math.round(this.roundElapsedMs),
+        points,
+      });
+    } catch {
+      ranking = undefined;
+    }
+
+    const panel = this.add.container(0, 0).setDepth(340).setScrollFactor(0);
+    const backdrop = this.add.rectangle(480, 270, 960, 540, 0x20364a, 0.3).setScrollFactor(0);
+    const card = this.add
+      .rectangle(480, 268, 590, 360, 0xffffff, 0.95)
+      .setStrokeStyle(5, characters[this.player.activeId].color, 0.95)
+      .setScrollFactor(0);
+    const title = this.add
+      .text(480, 118, `R${this.level.round} クリア！`, {
         fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
-        fontSize: "36px",
+        fontSize: "34px",
         fontStyle: "900",
         color: "#4a2a10",
         stroke: "#ffffff",
-        strokeThickness: 8,
+        strokeThickness: 5,
       })
       .setOrigin(0.5)
-      .setDepth(330)
       .setScrollFactor(0);
-    this.cameras.main.fadeOut(450, 255, 255, 255);
-    this.time.delayedCall(460, () => {
-      roundText.destroy();
-      this.startNextRound();
-    });
+    const summary = this.add
+      .text(480, 170, `TIME ${formatTime(this.roundElapsedMs)}   コイン ${roundCoins}   POINT ${points}`, {
+        fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
+        fontSize: "20px",
+        fontStyle: "900",
+        color: "#36556a",
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+    const rankText = this.add
+      .text(480, 272, this.getRankingText(ranking), {
+        fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
+        fontSize: "16px",
+        fontStyle: "700",
+        color: "#2d241f",
+        align: "center",
+        lineSpacing: 5,
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+    const continueButton = this.add
+      .rectangle(480, 416, 210, 48, 0x2f7ac8, 0.94)
+      .setStrokeStyle(4, 0xffffff, 1)
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: true });
+    const continueText = this.add
+      .text(480, 416, this.currentRoundIndex + 1 >= roundCount ? "ボスへすすむ" : "つぎへすすむ", {
+        fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
+        fontSize: "20px",
+        fontStyle: "900",
+        color: "#ffffff",
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+
+    panel.add([backdrop, card, title, summary, rankText, continueButton, continueText]);
+    const continueRun = () => {
+      panel.destroy();
+      this.physics.resume();
+      this.cameras.main.fadeOut(450, 255, 255, 255);
+      this.time.delayedCall(460, () => {
+        this.startNextRound();
+      });
+    };
+    continueButton.on("pointerdown", continueRun);
+    this.input.keyboard?.once("keydown-SPACE", continueRun);
+  }
+
+  private getRankingText(ranking?: SavedRoundRanking): string {
+    if (!ranking) {
+      return [
+        "ワールドランキング：接続待ち",
+        "Firebase設定を入れると、みんなの記録と共有できます。",
+        "",
+        "今回の記録はまだ送信されていません。",
+      ].join("\n");
+    }
+
+    return [
+      `${ranking.entry.playerName}  デイリー ${ranking.dailyRank}位 / いままで ${ranking.allTimeRank}位`,
+      "",
+      "デイリーTOP",
+      ...this.formatRankingRows(ranking.dailyTop),
+      "",
+      "いままでTOP",
+      ...this.formatRankingRows(ranking.allTimeTop),
+    ].join("\n");
+  }
+
+  private formatRankingRows(entries: SavedRoundRanking["dailyTop"]): string[] {
+    if (entries.length === 0) {
+      return ["まだ記録がありません"];
+    }
+    return entries.map((entry, index) => `${index + 1}. ${entry.playerName}  ${entry.points}pt  ${formatTime(entry.timeMs)}`);
   }
 
   private spawnStarBurst(x: number, y: number, color: number, count: number): void {
