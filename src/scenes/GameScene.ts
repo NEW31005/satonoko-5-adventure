@@ -514,7 +514,74 @@ export class GameScene extends Phaser.Scene {
       .setDepth(101)
       .setScrollFactor(0);
 
+    this.createHomeButton();
     this.updateUi(this.time.now);
+  }
+
+  private createHomeButton(): void {
+    const x = 840;
+    const y = 114;
+    const width = 126;
+    const height = 30;
+    const borderColor = 0x7bc9e8;
+
+    const shadow = this.add
+      .rectangle(x + 3, y + 4, width, height, 0x2f3a45, 0.14)
+      .setDepth(153)
+      .setScrollFactor(0);
+    const bg = this.add
+      .rectangle(x, y, width, height, 0xffffff, 0.9)
+      .setDepth(154)
+      .setScrollFactor(0)
+      .setStrokeStyle(3, borderColor, 0.9);
+    const house = this.add.graphics().setDepth(155).setScrollFactor(0);
+    house.lineStyle(3, borderColor, 0.95);
+    house.strokeTriangle(x - 49, y - 3, x - 37, y - 13, x - 25, y - 3);
+    house.strokeRect(x - 44, y - 3, 14, 12);
+
+    const label = this.add
+      .text(x + 16, y, "ホーム", {
+        fontFamily: '"Yu Gothic", "Meiryo", sans-serif',
+        fontSize: "14px",
+        fontStyle: "900",
+        color: "#3d332a",
+      })
+      .setOrigin(0.5)
+      .setDepth(155)
+      .setScrollFactor(0);
+
+    const hit = this.add
+      .zone(x, y, width + 10, height + 8)
+      .setDepth(156)
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: true });
+    const goHome = () => {
+      this.virtualControls = {
+        left: false,
+        right: false,
+        jumpHeld: false,
+        jumpQueued: false,
+      };
+      this.scene.start("TitleScene");
+    };
+    hit.on("pointerdown", () => {
+      bg.setFillStyle(0xe9f8ff, 0.96);
+      bg.setScale(1.03);
+      label.setScale(1.03);
+      goHome();
+    });
+    hit.on("pointerover", () => {
+      bg.setFillStyle(0xf5fcff, 0.96);
+    });
+    hit.on("pointerout", () => {
+      bg.setFillStyle(0xffffff, 0.9);
+      bg.setScale(1);
+      label.setScale(1);
+    });
+
+    shadow.setData("homeButton", true);
+    bg.setData("homeButton", true);
+    label.setData("homeButton", true);
   }
 
   private createTouchControls(): void {
