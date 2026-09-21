@@ -33,8 +33,8 @@ node tools/jev/cli.mjs status                        # mode, caps, budget, allow
 - **Default is OFF** and the real API stays off here — `api.typesafe.ai` currently
   403s at the egress proxy. Everything still works locally; the tooling says which
   path it took.
-- **Auth modes.** `JEV_AUTH_MODE=direct` (default) sends `x-api-key` and needs
-  `TYPESAFE_API_KEY`. `JEV_AUTH_MODE=proxy` sends **no auth header**: a cloud
+- **Auth modes.** `JEV_AUTH_MODE=direct` (default) sends `Authorization: Bearer`
+  (as the official SDK does) and needs `TYPESAFE_API_KEY`. `JEV_AUTH_MODE=proxy` sends **no auth header**: a cloud
   environment API credential makes Anthropic's agent proxy add
   `Authorization: Bearer` after the request leaves the VM, so no key is held here.
   `proxy` drops only the key requirement — every other gate still applies.
@@ -46,15 +46,22 @@ node tools/jev/cli.mjs status                        # mode, caps, budget, allow
 - Jev returns a typed choice only. Summaries, design, code generation, root-cause
   reasoning and anything executable stay with you.
 
-**Use `review` on your own work.** Before reporting on a diff of any size — your own
-branch included — run `node tools/jev/cli.mjs review <base> HEAD` and work from its
-`inventory`. Doing this on this repository's own PR is what surfaced an oversized
-digest, 126 bogus findings from prose, and a mis-tiered risk model.
+**When `review` is worth running.** Only for a **large or complex** diff — many files,
+or changes whose risk is not obvious from the file list. For a short, single-file, or
+already-understood diff, just read it: the helper would only add its own JSON on top.
+Running it on this repository's own large PR is what surfaced an oversized digest,
+126 bogus findings from prose, and a mis-tiered risk model.
 
-Then: always read the full `inventory` — it lists every changed file. Files in
-`notReviewed` are **not reviewed**; a file Jev did not select says nothing about its
-safety. Either open them with the printed command or raise `--budget`, and say
-plainly in your report which files you did not read.
+**Its output is an excerpt set, not a review.** `selectedExcerpts` are capped,
+truncated and context-free, and every entry carries `reviewed: false`. `notSelected`
+files are not shown at all. `verificationReads` lists everything still to be opened
+in full — selected files included. Always read the whole `inventory`, say plainly in
+your report which files you did not open, and never treat "Jev did not select it" as
+a safety signal.
+
+**A fully verified review costs MORE with the helper than without it** (measured:
++33.9% input). The helper buys triage order, not total savings. Use it to decide what
+to look at first on a big change — not to avoid reading.
 
 **Numbers — keep four things apart:**
 - bytes are **measured**; token figures are **estimates** unless `tokensMeasured:

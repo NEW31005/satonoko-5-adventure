@@ -93,8 +93,9 @@ const flag = (name) => TRUE.has(String(process.env[name] ?? '').trim().toLowerCa
 /**
  * Authentication modes.
  *
- *  direct  (default) -- we hold the key and send `x-api-key` ourselves, per the
- *                       official SDK. Requires TYPESAFE_API_KEY in this process.
+ *  direct  (default) -- we hold the key and send `Authorization: Bearer <key>`
+ *                       ourselves, as the official SDK does (dist/index.mjs:581).
+ *                       Requires TYPESAFE_API_KEY in this process.
  *  proxy             -- a Claude Code cloud-environment **API credential** holds
  *                       the key. Anthropic's agent proxy attaches
  *                       `Authorization: Bearer <key>` AFTER the request leaves the

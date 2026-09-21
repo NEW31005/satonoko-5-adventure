@@ -30,16 +30,22 @@ be reached anyway: the egress policy returns 403 for `api.typesafe.ai`.
 
 | Mode | Who holds the key | What we send | Needs `TYPESAFE_API_KEY` |
 | --- | --- | --- | --- |
-| `direct` (default) | this process | `x-api-key`, per the official SDK | **yes** |
+| `direct` (default) | this process | `Authorization: Bearer <key>` | **yes** |
 | `proxy` | the cloud environment | **nothing** | **no** |
 
 In `proxy` mode a Claude Code cloud-environment **API credential** holds the key.
 Anthropic's agent proxy attaches `Authorization: Bearer <key>` *after the request
 has left the session VM*, so the value never reaches this process, its environment
-variables, the commands it runs, or the agent. We therefore send **no auth header at
-all** — a test asserts that proxy mode withholds a key even when one is present in
-the environment, because sending one would leak a credential we are not supposed to
-hold.
+variables, the commands it runs, or the agent. We therefore send **neither `Authorization` nor
+`x-api-key`** — a test asserts that proxy mode withholds a key even when one is
+present in the environment, because sending one would leak a credential we are not
+supposed to hold.
+
+The header in `direct` mode is `Authorization: Bearer`, read from the official
+`@typesafe-ai/sdk` 0.6.0 build (`dist/index.mjs:581`). An earlier revision sent
+`x-api-key`; that was a misreading of `KEY_HEADERS` (`dist/index.mjs:285-288`), which
+is the set of header *names* whose values get masked in logs, not a header the SDK
+sets. Bearer also matches the real `200` the Windows/Codex side observed.
 
 `proxy` removes only the key requirement. Default-OFF, `JEV_ALLOW_REAL_API`, the
 budget caps, the allowlist and every other gate apply unchanged, and the endpoint is
@@ -199,31 +205,32 @@ Three quantities are kept apart and never conflated:
 level. Without `ANTHROPIC_API_KEY` every token figure carries `tokensMeasured:
 false` and names the estimator.
 
-### Results (`tools/jev/measurements/`, 23 files, 160,055 B raw diff)
+### Results (`tools/jev/measurements/`, 23 files, 176,511 B raw diff)
 
 **Cost basis: SIMULATED.** Every response came from a loopback mock replaying a
 fixture `usage`. No billed TypeSafe request has ever succeeded from this cloud
-environment, so no figure here is money spent.
+environment, so no dollar figure here is money spent. Token figures are estimates
+(`tokensMeasured: false`). Real account quota is not observable and is not reported.
 
-| Arm | Extraction input | Est. tokens | Completion input | Files left unread | Jev calls | Cost |
-| --- | --- | --- | --- | --- | --- | --- |
-| A plain diff | 161,715 | ~50,025 | — | 0 | 0 | — |
-| B local only | 57,298 | ~17,964 | 154,234 | 19 | 0 | — |
-| C Jev | 65,686 | ~20,572 | 151,982 | 19 | 1 | simulated $0.000080598 |
-| cache | 65,503 | ~20,515 | 151,799 | 19 | 0 | — |
+| Arm | Extraction input | Est. tokens | Full-verification input | Files needing verification | Jev calls |
+| --- | --- | --- | --- | --- | --- |
+| A plain diff | 178,168 | ~55,008 | 178,168 | 0 / 23 | 0 |
+| B local only | 66,086 | ~20,673 | 238,569 | 23 / 23 | 0 |
+| C Jev | 77,713 | ~24,262 | 238,807 | 23 / 23 | 1 |
+| cache | 77,530 | ~24,205 | 238,624 | 23 / 23 | 0 |
 
-**Two scopes, and they are not interchangeable.**
+**Extraction input** — what it costs to decide what to read first. B saves 62.91% of
+A; C saves 56.38% of A.
 
-*Extraction input* is what it costs to decide what to read. B saves 64.57% of A;
-C saves 59.38% of A. **C is 8,388 bytes LARGER than B** — that is −14.64% measured
-against B, and −5.19 percentage points measured against A. Those two numbers
-describe the same 8,388 bytes against different denominators.
+**Full-verification input** — what it costs to actually check the change. Every file
+lands in `verificationReads`, **selected ones included**, because their excerpts
+elide lines, truncate lines and drop context. An excerpt is not a reading of a file.
+Here the helper is a **net loss: B costs 33.90% MORE than A, and C 34.03% more.**
+Recorded as measured. The helper buys triage order on a large diff; it does not
+reduce the cost of a complete review.
 
-*Review completion* is what it costs to actually finish, because the 19 files the
-helper skipped still have to be read. There B saves **4.63%** and C **6.02%** of A.
-A ~60% extraction saving is not a ~60% saving on a completed review.
-
-**Where Jev does not pay.** On this diff the Jev call made the extraction input
-*worse*: it promoted a larger file into the read budget, so C cost more input than
-local ordering alone for a simulated $0.000080598. On a 702-line build log the helper
-cut 94.1% with **zero** Jev calls — local dedupe did all of it. Recorded as measured.
+**Jev's own effect (simulated).** C is **11,627 bytes worse than B** at extraction —
+**−17.59% measured against B**, or **−6.53 percentage points measured against A**
+(same bytes, different denominators) — because the call promoted a larger file into
+the excerpt budget, for a simulated $0.000080598. On a 702-line build log the helper
+cut 94.1% with **zero** Jev calls: local dedupe did all of it.

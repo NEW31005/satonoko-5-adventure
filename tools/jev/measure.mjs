@@ -81,13 +81,15 @@ function compare(A, B, C, cache) {
       denominatorWarning: 'C_vs_B_pctOfB uses B as the denominator; C_vs_B_percentagePointsOfA is a difference of two A-based percentages. They are not interchangeable.',
     },
     reviewCompletion: {
-      note: 'to COMPLETE the review every changed file must be read. Files the helper skipped are not reviewed, so the extraction saving above is not a completed-review quota saving.',
+      note: 'to COMPLETE the review every file in verificationReads must be opened in full -- selected files included, since their excerpts are capped, truncated and context-free. Nothing the helper emits is reviewed, so the extraction saving above is not a completed-review saving.',
       A_bytes: A.totalBytes,
       B_completionBytes: B.completionBytes,
       C_completionBytes: C.completionBytes,
       B_savedVsA_pctOfA: pct(A.totalBytes - B.completionBytes, A.totalBytes),
       C_savedVsA_pctOfA: pct(A.totalBytes - C.completionBytes, A.totalBytes),
-      filesLeftUnread: C.filesLeftUnread,
+      filesNeedingVerification: C.filesNeedingVerification,
+      filesTotal: C.filesTotal,
+      completionWarning: 'completion re-reads EVERY file in verificationReads, selected ones included, because excerpts elide lines, truncate lines and drop context. If that exceeds arm A, the helper costs MORE input for a fully verified review; recorded as measured.',
     },
   };
 }
@@ -112,19 +114,24 @@ async function measureReview(env) {
     const json = JSON.stringify(set, null, 2);
     // Follow-up: a reviewer must still open every high-risk file the digest
     // declined to read. That cost belongs to this arm.
-    const followups = set.notReviewed.filter((f) => f.risk === 'high');
+    const followups = set.notSelected.filter((f) => f.risk === 'high');
     const followupText = followups.map((f) => git(['diff', '--no-color', `${BASE}...${HEAD}`, '--', f.file])).join('\n');
-    // Completing the review means reading EVERY file the helper skipped, not
-    // only the high-risk ones.
-    const allSkipped = set.notReviewed.map((f) => git(['diff', '--no-color', `${BASE}...${HEAD}`, '--', f.file])).join('\n');
+    // Completing the review means opening every file in verificationReads --
+    // which includes SELECTED files, because their excerpts elided lines,
+    // truncated lines and dropped context. Counting only the unselected files
+    // understated this arm: the excerpt is not a reading of the file.
+    const allVerification = set.verificationReads
+      .map((f) => git(['diff', '--no-color', `${BASE}...${HEAD}`, '--', f.file])).join('\n');
     const acct = await accountInput({ instruction: REVIEW_INSTRUCTION, helperJson: json, followupReads: followupText }, { env });
     const digestOnly = await accountInput({ instruction: REVIEW_INSTRUCTION, helperJson: json }, { env });
     return {
       ...acct, ms, set,
       digestOnly: { totalBytes: digestOnly.totalBytes, totalTokens: digestOnly.totalTokens },
       followupReads: { files: followups.length, bytes: bytesOf(followupText), note: 'high-risk files the digest did not read in full' },
-      completionBytes: bytesOf(REVIEW_INSTRUCTION) + bytesOf(json) + bytesOf(allSkipped),
-      filesLeftUnread: set.notReviewed.length,
+      // Helper JSON is still counted: it was put in context before the reads.
+      completionBytes: bytesOf(REVIEW_INSTRUCTION) + bytesOf(json) + bytesOf(allVerification),
+      filesNeedingVerification: set.verificationReads.length,
+      filesTotal: set.totals.files,
       quality: qualityOf(json + followupText, allFiles, useJev ? 'C' : 'B'),
       jev: set.jev,
     };

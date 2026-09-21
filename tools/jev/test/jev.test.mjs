@@ -91,7 +91,7 @@ describe('happy path', () => {
     // $0.042/Mtok on input, output free.
     assert.ok(Math.abs(r.settlement.usd - (1919 / 1e6) * 0.042) < 1e-12);
     assert.equal(mock.seen[0].body.model, MODEL_PIN, 'request pins the model');
-    assert.equal(mock.seen[0].headers['x-api-key'], 'test-key-not-real', 'auth uses the SDK header');
+    assert.equal(mock.seen[0].headers.authorization, 'Bearer test-key-not-real', 'auth uses the SDK header');
     await mock.close();
   });
 });
@@ -435,12 +435,18 @@ describe('review narrowing invariants', () => {
     for (const f of changed) assert.ok(set.inventory.some((i) => i.file === f), `missing from inventory: ${f}`);
 
     // Narrowing decides what is READ, never what is LISTED.
-    assert.equal(set.totals.readInFull + set.totals.notReviewed, set.inventory.length);
-    for (const f of set.notReviewed) {
-      assert.equal(f.reviewed, false, 'an unread file must never be marked reviewed');
+    assert.equal(set.totals.selected + set.totals.notSelected, set.inventory.length);
+    assert.equal(set.totals.reviewed, 0, 'the helper never reviews anything');
+    for (const f of set.notSelected) {
+      assert.equal(f.reviewed, false, 'an unselected file must never be marked reviewed');
       assert.ok(f.command.includes(f.file), 'must say how to read it');
     }
-    if (set.notReviewed.length) assert.match(set.warning, /NOT reviewed/);
+    // A SELECTED file is an excerpt, not a reading.
+    for (const f of set.selectedExcerpts) {
+      assert.equal(f.reviewed, false, 'a selected file is excerpted, not reviewed');
+      assert.equal(f.excerptOnly, true);
+    }
+    assert.match(set.warning, /EXCERPT SET, not a review/);
   });
 
   test('a Jev-unselected file is never described as safe', async () => {
@@ -526,15 +532,15 @@ describe('token accounting honesty', () => {
 describe('auth modes (direct vs proxy)', () => {
   const AUTHY = ['authorization', 'x-api-key', 'api-key', 'proxy-authorization', 'x-typesafe-key'];
 
-  test('direct mode sends x-api-key and nothing else auth-shaped', async () => {
+  test('direct mode sends exactly one auth header: Authorization: Bearer', async () => {
     const mock = await mkMock([{}]);
     const { env } = freshEnv({ JEV_MOCK_BASE_URL: mock.baseUrl, JEV_AUTH_MODE: 'direct' });
     const r = await withEnv(env, () => systemOne({ state: 's', questions: CHOICE(['a', 'b']) }));
     assert.equal(r.ok, true);
     assert.equal(r.authMode, 'direct');
     const h = mock.seen[0].headers;
-    assert.equal(h['x-api-key'], 'test-key-not-real');
-    assert.equal(h.authorization, undefined, 'direct mode must not also send Authorization');
+    assert.equal(h.authorization, 'Bearer test-key-not-real');
+    assert.equal(h['x-api-key'], undefined, 'x-api-key is a log-redaction name, not a request header');
   });
 
   test('proxy mode sends NO auth header at all, and still hits the official path', async () => {
@@ -589,5 +595,54 @@ describe('auth modes (direct vs proxy)', () => {
     assert.equal(r.ok, false);
     assert.match(r.reason, /budget refused/);
     assert.equal(mock.requestCount(), 0);
+  });
+});
+
+describe('verification accounting covers excerpted files too', () => {
+  test('a selected file whose excerpt elided lines is in verificationReads', async () => {
+    const { env } = freshEnv({ JEV_ENABLED: '' });
+    const set = await withEnv(env, () => buildReviewSet({ base: 'origin/main', head: 'HEAD', budgetFiles: 4 }));
+    const elided = set.selectedExcerpts.filter((f) => f.linesElided > 0 || f.linesTruncated > 0 || f.contextLinesOmitted > 0);
+    assert.ok(elided.length > 0, 'this diff should elide something');
+    for (const f of elided) {
+      const entry = set.verificationReads.find((v) => v.file === f.file && v.origin === 'selected');
+      assert.ok(entry, `selected-but-incomplete file missing from verificationReads: ${f.file}`);
+      assert.ok(entry.reasons.length > 0);
+    }
+  });
+
+  test('verificationReads accounts for every changed file with a gap, selected or not', async () => {
+    const { env } = freshEnv({ JEV_ENABLED: '' });
+    const set = await withEnv(env, () => buildReviewSet({ base: 'origin/main', head: 'HEAD', budgetFiles: 4 }));
+    const covered = new Set(set.verificationReads.map((v) => v.file));
+    for (const f of set.notSelected) assert.ok(covered.has(f.file), `unselected file missing: ${f.file}`);
+    assert.equal(set.totals.needingVerification, set.verificationReads.length);
+    // Never claim a complete reading.
+    assert.ok(!JSON.stringify(set).includes('every changed file was read in full'));
+  });
+});
+
+describe('auth header matches the official SDK', () => {
+  test('direct mode sends Authorization: Bearer, not x-api-key', async () => {
+    // @typesafe-ai/sdk 0.6.0 dist/index.mjs:581 sets `Authorization: Bearer ${apiKey}`.
+    // `x-api-key` there is only a log-redaction name (KEY_HEADERS, lines 285-288).
+    const mock = await mkMock([{}]);
+    const { env } = freshEnv({ JEV_MOCK_BASE_URL: mock.baseUrl, JEV_AUTH_MODE: 'direct' });
+    const r = await withEnv(env, () => systemOne({ state: 's', questions: CHOICE(['a', 'b']) }));
+    assert.equal(r.ok, true);
+    const h = mock.seen[0].headers;
+    assert.equal(h.authorization, 'Bearer test-key-not-real');
+    assert.equal(h['x-api-key'], undefined, 'x-api-key is a redaction name, not a request header');
+  });
+
+  test('proxy mode sends neither Authorization nor x-api-key', async () => {
+    const mock = await mkMock([{}]);
+    const { env } = freshEnv({ JEV_MOCK_BASE_URL: mock.baseUrl, JEV_AUTH_MODE: 'proxy' });
+    env.TYPESAFE_API_KEY = 'leaked-key-must-not-be-sent';
+    await withEnv(env, () => systemOne({ state: 's', questions: CHOICE(['a', 'b']) }));
+    const h = mock.seen[0].headers;
+    assert.equal(h.authorization, undefined);
+    assert.equal(h['x-api-key'], undefined);
+    assert.ok(!JSON.stringify(mock.seen[0]).includes('leaked-key-must-not-be-sent'));
   });
 });

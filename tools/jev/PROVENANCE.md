@@ -65,12 +65,19 @@ egress policy blocks (403 at the proxy; see README.md). The wire contract implem
 | Tarball SHA256 | `ccd94517c911c58ed5284b15838a001393e304ea3b784f6e8fb5a79f6365378e` |
 | Repository | https://github.com/typesafe-ai/typesafe-sdk-js |
 | Endpoint | `POST https://api.typesafe.ai/v1/systemone` |
-| Auth header | `x-api-key` |
+| Auth header | `Authorization: Bearer <key>` (`dist/index.mjs:581`) |
 | Env vars | `TYPESAFE_API_KEY`, `TYPESAFE_BASE_URL`, `TYPESAFE_DEFAULT_MODEL` |
 | Default model | `jev-latest` (we pin `jev-1.13.0` instead) |
 | Request | `{ model, state, questions: { name: Choice|Noul|Score } }` |
 | Response | `{ model, answers, usage: { input_tokens, output_tokens } }` |
 
-The SDK is **not** vendored or installed; only its published type declarations were read
-to confirm the shapes. The Codex side observed `Authorization: Bearer` working against
-the real service; we implement the SDK's `x-api-key` form.
+The SDK is **not** vendored or installed; only its published build was read to confirm
+the shapes.
+
+**Correction.** An earlier revision of this file recorded the auth header as
+`x-api-key`, from a bare string grep of the bundle. That was wrong: `x-api-key` appears
+there only inside `KEY_HEADERS` (`dist/index.mjs:285-288`), the set of header names whose
+values are masked when logging. The header the SDK actually sets is
+`Authorization: Bearer ${apiKey}` at `dist/index.mjs:581`, which also matches the real
+`200` the Windows/Codex side observed. `tools/jev/lib/client.mjs` sends Bearer in
+`direct` mode and neither header in `proxy` mode.

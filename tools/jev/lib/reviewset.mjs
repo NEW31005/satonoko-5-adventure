@@ -210,32 +210,52 @@ export async function buildReviewSet({
   const selected = ordered.slice(0, budgetFiles);
   const selectedSet = new Set(selected.map((f) => f.file));
 
-  const readInFull = selected.map((f) => {
-    // Changed lines only, capped, with markers kept first so a cap can never
-    // drop evidence in favour of ordinary lines.
+  // NOTE: these are EXCERPTS, not a reading. Context lines are dropped, changed
+  // lines are capped, and long lines are truncated. Nothing here is reviewed.
+  const selectedExcerpts = selected.map((f) => {
     const all = f._parsed.hunks.flatMap((h) => h.lines.filter((l) => l.sign !== ' ')
       .map((l) => ({ ...l, hunk: h.header, marked: l.sign === '+' && markersFor(l.text, f.file).length > 0 })));
-    const marked = all.filter((l) => l.marked);
-    const rest = all.filter((l) => !l.marked);
-    const keep = [...marked, ...rest].slice(0, CAPS.maxHunkLinesPerFile);
+    const contextLines = f._parsed.hunks.reduce((a, h) => a + h.lines.filter((l) => l.sign === ' ').length, 0);
+    // Markers first, so a cap can never drop evidence in favour of ordinary lines.
+    const keep = [...all.filter((l) => l.marked), ...all.filter((l) => !l.marked)].slice(0, CAPS.maxHunkLinesPerFile);
     const keepSet = new Set(keep);
+    const shown = all.filter((l) => keepSet.has(l));
+    const truncated = shown.filter((l) => l.text.length > CAPS.maxDiffLineChars).length;
     return {
       file: f.file, risk: f.risk, riskReasons: f.riskReasons,
+      reviewed: false,
+      excerptOnly: true,
       hunkHeaders: f._parsed.hunks.map((h) => h.header),
-      lines: all.filter((l) => keepSet.has(l))
-        .map((l) => ({ sign: l.sign, old: l.old, new: l.new, text: l.text.slice(0, CAPS.maxDiffLineChars) })),
-      linesShown: keep.length,
+      lines: shown.map((l) => ({ sign: l.sign, old: l.old, new: l.new, text: l.text.slice(0, CAPS.maxDiffLineChars) })),
+      linesShown: shown.length,
       linesElided: Math.max(0, all.length - keep.length),
+      linesTruncated: truncated,
+      contextLinesOmitted: contextLines,
       command: `git diff ${base}...${head} -- ${f.file}`,
     };
   });
 
-  const notReviewed = ordered.filter((f) => !selectedSet.has(f.file)).map((f) => ({
+  const notSelected = ordered.filter((f) => !selectedSet.has(f.file)).map((f) => ({
     file: f.file, risk: f.risk, added: f.added, removed: f.removed,
-    reason: f.binary ? 'binary' : `outside the read budget of ${budgetFiles} file(s)`,
+    reason: f.binary ? 'binary' : `outside the excerpt budget of ${budgetFiles} file(s)`,
     command: `git diff ${base}...${head} -- ${f.file}`,
     reviewed: false,
   }));
+
+  // Everything a reviewer must still open to verify the change completely.
+  // A SELECTED file belongs here too whenever its excerpt elided lines, truncated
+  // a line, or dropped context -- which, since context is always dropped, is
+  // every selected file with any context at all.
+  const verificationReads = [
+    ...selectedExcerpts.map((f) => {
+      const reasons = [];
+      if (f.linesElided) reasons.push(`${f.linesElided} changed line(s) elided`);
+      if (f.linesTruncated) reasons.push(`${f.linesTruncated} line(s) truncated at ${CAPS.maxDiffLineChars} chars`);
+      if (f.contextLinesOmitted) reasons.push(`${f.contextLinesOmitted} context line(s) omitted`);
+      return reasons.length ? { file: f.file, risk: f.risk, origin: 'selected', reasons, command: f.command } : null;
+    }).filter(Boolean),
+    ...notSelected.map((f) => ({ file: f.file, risk: f.risk, origin: 'not-selected', reasons: [f.reason], command: f.command })),
+  ];
 
   // Group pinned evidence: counts are exact, examples are capped.
   const byKey = new Map();
@@ -256,8 +276,10 @@ export async function buildReviewSet({
       files: inventory.length,
       added: inventory.reduce((a, f) => a + f.added, 0),
       removed: inventory.reduce((a, f) => a + f.removed, 0),
-      readInFull: readInFull.length,
-      notReviewed: notReviewed.length,
+      selected: selectedExcerpts.length,
+      notSelected: notSelected.length,
+      needingVerification: verificationReads.length,
+      reviewed: 0,
     },
     // The complete list, always, whatever was narrowed.
     inventory: inventory.map(({ _parsed, ...rest }) => rest),
@@ -268,12 +290,15 @@ export async function buildReviewSet({
       groupsShown: pinnedShown.length,
       groupsElided: Math.max(0, pinnedGroups.length - pinnedShown.length),
     },
-    readInFull,
-    notReviewed,
+    selectedExcerpts,
+    notSelected,
+    verificationReads,
     jev,
-    warning: notReviewed.length
-      ? `${notReviewed.length} changed file(s) were NOT read in full and are NOT reviewed. Jev not selecting a file says nothing about its safety. Read them with the commands in notReviewed, or raise --budget.`
-      : 'every changed file was read in full',
+    warning:
+      'This is an EXCERPT SET, not a review. Nothing here has been reviewed: selected files are '
+      + 'shown as capped, truncated, context-free excerpts, and unselected files are not shown at all. '
+      + `${verificationReads.length} of ${inventory.length} changed file(s) must still be opened in full to verify this change `
+      + '(see verificationReads). A file Jev did not select says nothing about its safety.',
     elapsedMs: Date.now() - t0,
     rawDiffBytes: Buffer.byteLength(raw),
   };

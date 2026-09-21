@@ -1,11 +1,22 @@
 // Guarded HTTP client for POST /v1/systemone.
 //
 // Two authentication modes, chosen by JEV_AUTH_MODE (see config.mjs):
-//   direct (default) -- we send `x-api-key`, per the official @typesafe-ai/sdk build.
-//   proxy            -- we send NOTHING; a Claude Code cloud-environment API
-//                       credential makes the agent proxy add `Authorization:
-//                       Bearer <key>` after the request leaves the VM.
+//   direct (default) -- we send `Authorization: Bearer <key>`.
+//   proxy            -- we send NEITHER auth header; a Claude Code cloud-environment
+//                       API credential makes the agent proxy add
+//                       `Authorization: Bearer <key>` after the request leaves the VM.
 // The endpoint is the same fixed official HTTPS URL either way.
+//
+// The header is `Authorization: Bearer`, verified in the official
+// @typesafe-ai/sdk 0.6.0 build:
+//
+//     headers = mergeHeaders(req.headers, {
+//       Authorization: `Bearer ${this.#apiKey}`, ...            // dist/index.mjs:581
+//
+// An earlier revision of this file sent `x-api-key`. That was a misreading: in
+// that build `x-api-key` occurs only inside KEY_HEADERS (dist/index.mjs:285-288),
+// the set of header names whose values are masked when logging -- not a header the
+// SDK ever sets. Bearer is also what the Windows/Codex side got a real 200 from.
 //
 // Every failure path is explicit:
 //   401 / 403 / missing key / budget refused -> zero retries, local fallback
@@ -128,7 +139,7 @@ export async function systemOne({ state, questions, env = process.env, fetchImpl
         'user-agent': 'satonoko-jev-preprocess/1 (local guard rails)',
       };
       if (mode.authMode === 'direct') {
-        headers['x-api-key'] = String(env.TYPESAFE_API_KEY ?? '');
+        headers.authorization = `Bearer ${String(env.TYPESAFE_API_KEY ?? '')}`;
       }
       // proxy mode: send NO auth header. The cloud environment's API credential
       // is attached by Anthropic's agent proxy once the request has left the VM.
