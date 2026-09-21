@@ -157,7 +157,8 @@ export function resolveMode(env = process.env) {
       authMode,
       reason: 'HTTPS_PROXY is set but NODE_USE_ENV_PROXY is not: node fetch would bypass the agent proxy, '
         + 'leaving the request outside egress policy and (in proxy mode) unauthenticated. '
-        + 'Relaunch with NODE_USE_ENV_PROXY=1.',
+        + 'Setting it from inside a running process has no effect (undici reads it at startup): '
+        + 'relaunch with NODE_USE_ENV_PROXY=1 in the environment, or set it on the cloud environment.',
     };
   }
   return { kind: 'real', endpoint: OFFICIAL_ENDPOINT, authMode };
