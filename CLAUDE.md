@@ -21,13 +21,14 @@ The official TypeSafe skill is installed **unmodified** at
 Do not edit it. Our own guard rails live only in `tools/jev/` — see
 `tools/jev/README.md`.
 
-Use it to keep large material out of context:
+Use it for triage order and log dedupe — see the operating rule below for when it
+is and is not the right tool:
 
 ```sh
 node tools/jev/cli.mjs log <file> --question "…"     # long log  → pinned evidence + digest
 node tools/jev/cli.mjs find <regex> --question "…"   # many hits → one file:line + excerpt
-node tools/jev/cli.mjs review <base> [head]          # long diff → inventory + pinned + unread list
-node tools/jev/cli.mjs status                        # mode, caps, budget, allowlist
+node tools/jev/cli.mjs review <base> [head]          # large diff → inventory + pinned + verificationReads
+node tools/jev/cli.mjs status                        # mode, auth mode, caps, budget, allowlist
 ```
 
 - **Default is OFF** and the real API stays off here — `api.typesafe.ai` currently
@@ -46,22 +47,31 @@ node tools/jev/cli.mjs status                        # mode, caps, budget, allow
 - Jev returns a typed choice only. Summaries, design, code generation, root-cause
   reasoning and anything executable stay with you.
 
-**When `review` is worth running.** Only for a **large or complex** diff — many files,
-or changes whose risk is not obvious from the file list. For a short, single-file, or
-already-understood diff, just read it: the helper would only add its own JSON on top.
-Running it on this repository's own large PR is what surfaced an oversized digest,
-126 bogus findings from prose, and a mis-tiered risk model.
+**Operating rule — when to preprocess, and when not to.**
 
-**Its output is an excerpt set, not a review.** `selectedExcerpts` are capped,
-truncated and context-free, and every entry carries `reviewed: false`. `notSelected`
-files are not shown at all. `verificationReads` lists everything still to be opened
-in full — selected files included. Always read the whole `inventory`, say plainly in
-your report which files you did not open, and never treat "Jev did not select it" as
-a safety signal.
+The goal is to reduce Codex/Claude consumption, not to use Jev. Measured on this
+repo: a *fully verified* review costs **33.9% MORE** input through the helper than
+reading the diff directly, because the helper's JSON is overhead on top of opening
+every file anyway.
 
-**A fully verified review costs MORE with the helper than without it** (measured:
-+33.9% input). The helper buys triage order, not total savings. Use it to decide what
-to look at first on a big change — not to avoid reading.
+So:
+
+- **Reviewing a change completely → read `git diff` directly.** That is the default
+  for any review where you intend to check every file. Do not add a helper pass on
+  top of it, and never run both as a double read.
+- **Use `review` only when you are NOT going to read everything**: a large candidate
+  set where the question is *what to investigate first*. It buys triage order, not
+  savings.
+- **Use `log` for long logs**, where local dedupe does the real work — 94.1%
+  measured, with zero Jev calls.
+- **Small or already-understood input → read it directly.** The helper would only
+  add its own JSON.
+
+Its output is an **excerpt set, not a review**: `selectedExcerpts` are capped,
+truncated and context-free and carry `reviewed: false`, `notSelected` files are not
+shown at all, and `verificationReads` lists everything still to be opened in full —
+selected files included. Always read the whole `inventory`, say plainly which files
+you did not open, and never treat "Jev did not select it" as a safety signal.
 
 **Numbers — keep four things apart:**
 - bytes are **measured**; token figures are **estimates** unless `tokensMeasured:

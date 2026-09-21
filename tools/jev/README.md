@@ -89,6 +89,23 @@ node tools/jev/bench.mjs [--mock]                   # measure against a local ba
 node tools/jev/measure.mjs [--mock]                 # A/B/C/cache arms, full input accounting
 ```
 
+## Operating rule
+
+The objective is fewer Codex/Claude tokens, **not** more Jev calls. The measurement
+below shows a fully verified review costs **33.9% more** input through the helper
+than reading the diff directly, so:
+
+| Situation | Do this |
+| --- | --- |
+| Reviewing a change completely | **`git diff` directly.** No helper pass on top, and never both |
+| Large candidate set, you will *not* read it all | `review` — for investigation **order** only |
+| Long log | `log` — local dedupe does the work (94.1% measured, 0 Jev calls) |
+| Small or already-understood input | read it directly |
+
+The helper buys triage order on material you were never going to read in full. It
+does not make a complete review cheaper, and it must not become a mandatory second
+read of a diff you are already reading.
+
 ## When NOT to call Jev
 
 Two gates, and either one keeps the work local:
