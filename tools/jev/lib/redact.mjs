@@ -34,6 +34,19 @@ export function findSecrets(text) {
 export const isClean = (text) => findSecrets(text).length === 0;
 
 /**
+ * Rules that indicate an ACTUAL credential value, not merely the word "secret".
+ *
+ * Blocking outbound data should be paranoid: `findSecrets` deliberately matches
+ * `secret:` used as an object key. Risk-tiering a diff must be precise instead,
+ * or every file that names a variable `clientSecret` is scored high and real
+ * findings get buried. Use this for judgement, `findSecrets` for transmission.
+ */
+const STRONG = new Set(['private-key-block', 'anthropic-key', 'openai-key', 'github-token',
+  'aws-access-key', 'google-key', 'slack-token', 'jwt', 'bearer', 'dpapi-blob']);
+
+export const findStrongSecrets = (text) => findSecrets(text).filter((r) => STRONG.has(r));
+
+/**
  * Drop every offending line. Returns the surviving text plus an audit trail so the
  * caller can report "N lines withheld" instead of silently losing evidence.
  */

@@ -7,6 +7,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startMock } from './mock-server.mjs';
+import { execFileSync } from 'node:child_process';
 
 // Every mock is closed even when an assertion throws: an open server keeps the
 // process alive and the whole file then dies on the runner timeout.
@@ -417,5 +418,107 @@ describe('local relevance ranking', () => {
   test('ranking is stable for equal scores', () => {
     const hits = [{ path: 'a.ts', line: 1, text: 'x' }, { path: 'b.ts', line: 1, text: 'x' }];
     assert.deepEqual(rankHits(hits, '').map((h) => h.path), ['a.ts', 'b.ts']);
+  });
+});
+
+const { buildReviewSet, parseDiff, markersFor, riskOf } = await import('../lib/reviewset.mjs');
+const { findStrongSecrets } = await import('../lib/redact.mjs');
+const { estimateTokens, countTokens, bytesOf } = await import('../lib/tokens.mjs');
+
+describe('review narrowing invariants', () => {
+  test('every changed file is in the inventory, and skipped ones are declared unreviewed', async () => {
+    const { env } = freshEnv({ JEV_ENABLED: '' });
+    const set = await withEnv(env, () => buildReviewSet({ base: 'HEAD~1', head: 'HEAD', budgetFiles: 1 }));
+    const changed = execFileSync('git', ['diff', '--name-only', 'HEAD~1...HEAD'], { encoding: 'utf8' })
+      .split('\n').filter(Boolean);
+    assert.equal(set.inventory.length, changed.length, 'inventory must list every changed file');
+    for (const f of changed) assert.ok(set.inventory.some((i) => i.file === f), `missing from inventory: ${f}`);
+
+    // Narrowing decides what is READ, never what is LISTED.
+    assert.equal(set.totals.readInFull + set.totals.notReviewed, set.inventory.length);
+    for (const f of set.notReviewed) {
+      assert.equal(f.reviewed, false, 'an unread file must never be marked reviewed');
+      assert.ok(f.command.includes(f.file), 'must say how to read it');
+    }
+    if (set.notReviewed.length) assert.match(set.warning, /NOT reviewed/);
+  });
+
+  test('a Jev-unselected file is never described as safe', async () => {
+    const { env } = freshEnv({ JEV_ENABLED: '' });
+    const set = await withEnv(env, () => buildReviewSet({ base: 'HEAD~1', head: 'HEAD', budgetFiles: 1 }));
+    const blob = JSON.stringify(set).toLowerCase();
+    for (const word of ['"safe"', 'looks fine', 'no issues found', 'reviewed: true'])
+      assert.ok(!blob.includes(word), `must not claim: ${word}`);
+  });
+
+  test('diff parsing preserves both old and new line numbers', () => {
+    const files = parseDiff([
+      'diff --git a/src/a.ts b/src/a.ts',
+      '@@ -10,3 +20,4 @@ function f() {',
+      ' keep',
+      '-gone',
+      '+added one',
+      '+added two',
+    ].join('\n'));
+    assert.equal(files.length, 1);
+    const lines = files[0].hunks[0].lines;
+    assert.deepEqual(lines.map((l) => [l.sign, l.old, l.new]), [
+      [' ', 10, 20], ['-', 11, null], ['+', null, 21], ['+', null, 22],
+    ]);
+    assert.equal(files[0].added, 2);
+    assert.equal(files[0].removed, 1);
+  });
+
+  test('markers are precise: prose and licence text are not code findings', () => {
+    // Regression: these produced 126 bogus pinned entries on a real PR.
+    assert.deepEqual(markersFor('Permission is hereby granted, free of charge', 'LICENSE'), []);
+    assert.deepEqual(markersFor('see [docs](https://docs.typesafe.ai/llms.txt)', 'SKILL.md'), []);
+    assert.deepEqual(markersFor("const STRONG = new Set(['private-key-block']);", 'lib/redact.mjs'), []);
+    // ...and real findings still fire.
+    assert.ok(markersFor('it.skip("flaky", () => {})', 'a.test.ts').includes('skipped-test'));
+    assert.ok(markersFor('const r = await fetch(u);', 'a.ts').includes('network'));
+    assert.ok(markersFor('// @ts-ignore', 'a.ts').includes('suppression'));
+    assert.ok(markersFor('allow read: if true;', 'firestore.rules').includes('auth-surface'));
+    assert.ok(markersFor('const k = "sk-ant-api03-AAAAAAAAAAAAAAAAAAAA";', 'a.ts').includes('possible-secret'));
+  });
+
+  test('strong-secret tiering is narrower than outbound blocking', () => {
+    // Blocking stays paranoid; tiering must not flag every `secret:` key.
+    assert.ok(findSecrets("secret: 'abcdefghijkl'").length > 0, 'blocking still catches it');
+    assert.equal(findStrongSecrets("secret: 'abcdefghijkl'").length, 0, 'tiering must not');
+    assert.ok(findStrongSecrets('ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA').length > 0);
+  });
+
+  test('risk tiers put sensitive paths and suppressions above docs', () => {
+    assert.equal(riskOf('firestore.rules', ['allow read: if true;']).tier, 'high');
+    assert.equal(riskOf('src/a.ts', ['// @ts-ignore']).tier, 'high');
+    assert.equal(riskOf('README.md', ['just words']).tier, 'low');
+    assert.equal(riskOf('package-lock.json', ['{}']).tier, 'generated');
+  });
+});
+
+describe('token accounting honesty', () => {
+  test('bytes are measured; tokens without a credential are a labelled estimate', async () => {
+    const r = await countTokens('hello world', { env: {} });
+    assert.equal(r.measured, false);
+    assert.match(r.method, /estimate/);
+    assert.match(r.reason, /ANTHROPIC_API_KEY/);
+    assert.equal(bytesOf('hello'), 5);
+    assert.ok(estimateTokens('hello world') > 0);
+  });
+
+  test('a successful count_tokens call is reported as measured', async () => {
+    const fake = async () => new Response(JSON.stringify({ input_tokens: 4242 }), { status: 200 });
+    const r = await countTokens('x', { env: { ANTHROPIC_API_KEY: 'k' }, fetchImpl: fake });
+    assert.equal(r.measured, true);
+    assert.equal(r.tokens, 4242);
+    assert.match(r.method, /count_tokens/);
+  });
+
+  test('a failed count_tokens call degrades to an estimate, never a fake measurement', async () => {
+    const fake = async () => new Response('nope', { status: 401 });
+    const r = await countTokens('x', { env: { ANTHROPIC_API_KEY: 'k' }, fetchImpl: fake });
+    assert.equal(r.measured, false);
+    assert.match(r.reason, /401/);
   });
 });

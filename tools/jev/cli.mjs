@@ -6,6 +6,7 @@
 //   node tools/jev/cli.mjs status
 //   node tools/jev/cli.mjs find <regex> --question "..." [--glob '*.ts']
 //   node tools/jev/cli.mjs log <file> [--question "..."] [--top 12]
+//   node tools/jev/cli.mjs review <base> <head> [--budget 6]
 //   node tools/jev/cli.mjs allow <path>...        # exact repo-relative paths
 //   node tools/jev/cli.mjs budget
 
@@ -15,6 +16,7 @@ import { CAPS, BUDGET, MODEL_PIN, PRICING, OFFICIAL_ENDPOINT, resolveMode, allow
 import { snapshot } from './lib/budget.mjs';
 import { selectCandidate } from './lib/candidates.mjs';
 import { digestLog } from './lib/logdigest.mjs';
+import { buildReviewSet } from './lib/reviewset.mjs';
 
 function parseArgs(argv) {
   const positional = [];
@@ -93,6 +95,13 @@ async function main() {
     return print({ command: 'find', ...result });
   }
 
+  if (cmd === 'review') {
+    const base = positional[1], head = positional[2] ?? 'HEAD';
+    if (!base) return print({ command: 'review', error: 'usage: review <base> [head] [--budget N]' });
+    const result = await buildReviewSet({ base, head, budgetFiles: Number(one(flags.budget, 6)) });
+    return print({ command: 'review', ...result });
+  }
+
   if (cmd === 'log') {
     const file = positional[1];
     if (!file) return print({ command: 'log', error: 'usage: log <file> [--question "..."]' });
@@ -104,7 +113,7 @@ async function main() {
     return print({ command: 'log', ...result });
   }
 
-  return print({ error: `unknown command '${cmd}'`, commands: ['status', 'find', 'log', 'allow', 'budget'] });
+  return print({ error: `unknown command '${cmd}'`, commands: ['status', 'find', 'log', 'review', 'allow', 'budget'] });
 }
 
 main().catch((e) => {

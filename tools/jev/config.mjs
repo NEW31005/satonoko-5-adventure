@@ -19,10 +19,22 @@ export const PRICING = {
   outputUsdPerMTok: 0,
 };
 
-/** Initial local-development ceilings. Attempts are counted, not just calls. */
+/**
+ * THIS ENVIRONMENT'S OWN ALLOCATION. Not a shared pot.
+ *
+ * The overall development budget is split by environment because no shared
+ * ledger exists between them:
+ *   Windows host / Codex helper : $0.08/day, $4.00/month  (holds the key)
+ *   This Claude cloud container : $0.02/day, $1.00/month  (values below)
+ *
+ * Each side enforces only its own numbers. Totals are combined ONLY if every
+ * environment points JEV_LEDGER_PATH at one shared file, which is not possible
+ * across the cloud/Windows boundary today. Until then these are independent
+ * caps, and the ledger must not be described as a shared atomic budget.
+ */
 export const BUDGET = {
-  dailyUsd: 0.10,
-  monthlyUsd: 5.00,
+  dailyUsd: 0.02,
+  monthlyUsd: 1.00,
   dailyAttempts: 20,
   dailyReservedTokens: 100_000,
   maxConcurrent: 2,
@@ -51,6 +63,16 @@ export const CAPS = {
   cacheTtlMs: 24 * 60 * 60 * 1000,
   /** A lease older than this is settled as fully spent, never refunded. */
   staleLeaseMs: 5 * 60 * 1000,
+  /**
+   * Review-output caps. Without these the "digest" of a large diff came out
+   * BIGGER than the raw diff (113,774 B -> 132,843 B on PR #1), which is a net
+   * loss. Counts of anything elided are always reported.
+   */
+  maxPinnedShown: 40,
+  maxPinnedPerTag: 6,
+  maxHunkLinesPerFile: 50,
+  maxDiffLineChars: 160,
+
   /** Below this many candidates the work is small: answer locally, never call Jev. */
   minCandidatesForJev: 8,
   /**

@@ -26,6 +26,7 @@ Use it to keep large material out of context:
 ```sh
 node tools/jev/cli.mjs log <file> --question "…"     # long log  → pinned evidence + digest
 node tools/jev/cli.mjs find <regex> --question "…"   # many hits → one file:line + excerpt
+node tools/jev/cli.mjs review <base> [head]          # long diff → inventory + pinned + unread list
 node tools/jev/cli.mjs status                        # mode, caps, budget, allowlist
 ```
 
@@ -39,10 +40,23 @@ node tools/jev/cli.mjs status                        # mode, caps, budget, allow
 - Jev returns a typed choice only. Summaries, design, code generation, root-cause
   reasoning and anything executable stay with you.
 
+**Reviewing with `review`:** always read the full `inventory` — it lists every
+changed file. Files in `notReviewed` are **not reviewed**; a file Jev did not select
+says nothing about its safety. Either open them with the printed command or raise
+`--budget`, and say plainly in your report which files you did not read.
+
+**Numbers:** bytes are measured; token figures are estimates unless
+`tokensMeasured: true` (which needs `ANTHROPIC_API_KEY` for the official
+`count_tokens` endpoint). Account quota is not observable here — never claim it.
+
 Before changing anything under `tools/jev/`, run `sh tools/jev/test/run.sh`
 (mock HTTP, loopback only — it contacts no external service).
 
 ## Known state
+
+Jev budget for this environment: $0.02/day, $1.00/month. The Windows/Codex side has
+a separate $0.08/day, $4.00/month allocation — the two ledgers are independent, not
+a shared pot.
 
 `npm audit` reports 3 high-severity advisories in dev dependencies
 (`nanoid`, `postcss`, `vite`). Not addressed here: the lockfile belongs to the
