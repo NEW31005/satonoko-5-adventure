@@ -9,3 +9,6 @@ chrome-icons-check-2/
 icons-check.png
 icons-check-2.png
 boss-source.png
+
+# Jev/TypeSafe local ledger and answer cache (never commit)
+.jev/

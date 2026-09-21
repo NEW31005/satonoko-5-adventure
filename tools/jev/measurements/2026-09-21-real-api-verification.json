@@ -1,0 +1,46 @@
+{
+  "what": "Single authorized real-API verification through the existing guarded client.",
+  "fixture": "synthetic only: 10 invented one-line snippets about a counter; no repository source, no personal data, no secrets, no conversation content was sent",
+  "authorization": "one call only; retries forced to 0 via JEV_MAX_RETRIES=0",
+  "endpoint": "https://api.typesafe.ai/v1/systemone",
+  "authMode": "proxy",
+  "authHeadersSetByUs": [],
+  "authNote": "we set no Authorization and no x-api-key; the cloud environment API credential is attached by the agent proxy after the request leaves the VM. The key value is not present in this process and was never read.",
+  "apiKeyPresentInProcess": false,
+  "result": {
+    "httpStatus": 200,
+    "httpCalls": 1,
+    "attempts": 1,
+    "resolvedModel": "jev-1.13.0",
+    "modelPinMatches": true,
+    "chosenCandidate": "c7",
+    "expectedCandidate": "c7",
+    "correct": true,
+    "confidence": 1,
+    "rejectedAnswers": {},
+    "latencyMs": 763
+  },
+  "usageReal": { "input_tokens": 593, "output_tokens": 99 },
+  "costUsdReal": 0.000024906,
+  "costBasis": "real: response came from api.typesafe.ai",
+  "pricing": { "confirmedOn": "2026-09-22", "inputUsdPerMTok": 0.042, "outputUsdPerMTok": 0 },
+  "settlement": { "settledAs": "actual", "inputTokens": 593, "outputTokens": 99, "usd": 0.000024906 },
+  "cacheReuse": { "secondReadHit": true, "choice": "c7", "extraHttpCalls": 0 },
+  "budgetAfter": {
+    "dayAttempts": 2,
+    "dayUsd": 0.000036288,
+    "monthUsd": 0.000036288,
+    "caps": { "dayAttempts": 20, "dayTokens": 100000, "dayUsd": 0.02, "monthUsd": 1.0 }
+  },
+  "firstAttemptBeforeFix": {
+    "httpStatus": 403,
+    "reachedTypeSafe": false,
+    "billed": false,
+    "cause": "node's built-in fetch ignores HTTPS_PROXY unless NODE_USE_ENV_PROXY is set before process start, so the request bypassed the agent proxy; the agent proxy is also what attaches the credential, so the call could never have authenticated",
+    "fix": "resolveMode now refuses a real call when HTTPS_PROXY is set and NODE_USE_ENV_PROXY is not"
+  },
+  "reachability": {
+    "docs.typesafe.ai": "200 (read-only check, no credential)",
+    "api.typesafe.ai": "reachable through the agent proxy"
+  }
+}
