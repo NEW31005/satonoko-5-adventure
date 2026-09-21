@@ -1,0 +1,20 @@
+{
+  "_comment": "Exact repo-relative paths whose CONTENT may be sent to the TypeSafe API. No globs, no directories. Add with: node tools/jev/cli.mjs allow <path>",
+  "paths": [
+    "src/data/characters.ts",
+    "src/data/difficulty.ts",
+    "src/data/levelData.ts",
+    "src/data/ranking.ts",
+    "src/main.ts",
+    "src/objects/Dinosaur.ts",
+    "src/objects/Enemy.ts",
+    "src/objects/Player.ts",
+    "src/scenes/BossScene.ts",
+    "src/scenes/ClearScene.ts",
+    "src/scenes/GameScene.ts",
+    "src/scenes/TitleScene.ts",
+    "tools/jev/lib/budget.mjs",
+    "tools/jev/lib/cache.mjs",
+    "tools/jev/lib/client.mjs"
+  ]
+}
