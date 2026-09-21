@@ -51,8 +51,12 @@ export const CAPS = {
   maxQuestions: 8,
   /** Characters of any single candidate excerpt. */
   maxExcerptChars: 600,
-  /** Retries after the first attempt, for rate limits and 5xx only. */
-  maxRetries: 1,
+  /**
+   * Retries after the first attempt, for rate limits and 5xx only.
+   * Overridable so a one-shot verification can guarantee a single billed
+   * attempt rather than merely expecting one. Clamped to 0..3.
+   */
+  maxRetries: Math.min(3, Math.max(0, Number.isFinite(Number(process.env.JEV_MAX_RETRIES)) && process.env.JEV_MAX_RETRIES !== '' ? Number(process.env.JEV_MAX_RETRIES) : 1)),
   /** Per-attempt timeout. Overridable for tests; clamped to a sane range. */
   timeoutMs: Math.min(60_000, Math.max(200, Number(process.env.JEV_TIMEOUT_MS) || 10_000)),
   /** Conservative bytes-per-token estimate used to reserve budget up front. */
@@ -138,6 +142,23 @@ export function resolveMode(env = process.env) {
   // Only proxy mode is exempt from holding a key, because it never sends one.
   if (authMode === 'direct' && !String(env.TYPESAFE_API_KEY ?? '').trim()) {
     return { kind: 'off', reason: 'TYPESAFE_API_KEY is not present in this environment', authMode };
+  }
+  // Node's built-in fetch does NOT read HTTPS_PROXY unless NODE_USE_ENV_PROXY is
+  // set before the process starts. Going out un-proxied is not merely a
+  // connectivity problem: the agent proxy is what enforces the egress policy and,
+  // in proxy auth mode, what attaches the credential. A request that skips it
+  // would leave unauthenticated and outside policy, so refuse instead of sending.
+  // Setting the variable from inside the process is too late -- undici reads it at
+  // startup -- so this can only be fixed by relaunching with the flag.
+  const proxyConfigured = Boolean(String(env.HTTPS_PROXY ?? env.https_proxy ?? '').trim());
+  if (proxyConfigured && !TRUE.has(String(env.NODE_USE_ENV_PROXY ?? '').trim().toLowerCase())) {
+    return {
+      kind: 'off',
+      authMode,
+      reason: 'HTTPS_PROXY is set but NODE_USE_ENV_PROXY is not: node fetch would bypass the agent proxy, '
+        + 'leaving the request outside egress policy and (in proxy mode) unauthenticated. '
+        + 'Relaunch with NODE_USE_ENV_PROXY=1.',
+    };
   }
   return { kind: 'real', endpoint: OFFICIAL_ENDPOINT, authMode };
 }

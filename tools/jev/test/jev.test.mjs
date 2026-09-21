@@ -22,6 +22,9 @@ function freshEnv(extra = {}) {
     dir,
     env: {
       JEV_ENABLED: '1',
+      // Pinned so the suite is deterministic regardless of the ambient session
+      // environment, which may itself set JEV_AUTH_MODE=proxy for real use.
+      JEV_AUTH_MODE: 'direct',
       TYPESAFE_API_KEY: 'test-key-not-real',
       JEV_LEDGER_PATH: join(dir, 'budget.json'),
       JEV_CACHE_PATH: join(dir, 'cache.json'),
@@ -644,5 +647,22 @@ describe('auth header matches the official SDK', () => {
     assert.equal(h.authorization, undefined);
     assert.equal(h['x-api-key'], undefined);
     assert.ok(!JSON.stringify(mock.seen[0]).includes('leaked-key-must-not-be-sent'));
+  });
+});
+
+describe('agent-proxy bypass guard', () => {
+  test('refuses a real call when node fetch would bypass the proxy', () => {
+    // Found for real: node's fetch ignores HTTPS_PROXY unless NODE_USE_ENV_PROXY
+    // is set before startup, so the request left un-proxied and the cloud
+    // credential was never attached.
+    const base = { JEV_ENABLED: '1', JEV_ALLOW_REAL_API: '1', JEV_AUTH_MODE: 'proxy', HTTPS_PROXY: 'http://127.0.0.1:35933' };
+    const blocked = resolveMode(base);
+    assert.equal(blocked.kind, 'off');
+    assert.match(blocked.reason, /NODE_USE_ENV_PROXY/);
+    assert.equal(resolveMode({ ...base, NODE_USE_ENV_PROXY: '1' }).kind, 'real');
+  });
+
+  test('the guard does not fire when no proxy is configured', () => {
+    assert.equal(resolveMode({ JEV_ENABLED: '1', JEV_ALLOW_REAL_API: '1', JEV_AUTH_MODE: 'proxy' }).kind, 'real');
   });
 });

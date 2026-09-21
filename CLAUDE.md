@@ -31,9 +31,10 @@ node tools/jev/cli.mjs review <base> [head]          # large diff → inventory 
 node tools/jev/cli.mjs status                        # mode, auth mode, caps, budget, allowlist
 ```
 
-- **Default is OFF** and the real API stays off here — `api.typesafe.ai` currently
-  403s at the egress proxy. Everything still works locally; the tooling says which
-  path it took.
+- **Default is OFF.** Everything works locally; the tooling says which path it took.
+- **Real calls need `NODE_USE_ENV_PROXY=1`.** Node's `fetch` otherwise bypasses the
+  agent proxy, which both enforces egress policy and attaches the cloud credential.
+  The client refuses a real call without it rather than sending un-proxied.
 - **Auth modes.** `JEV_AUTH_MODE=direct` (default) sends `Authorization: Bearer`
   (as the official SDK does) and needs `TYPESAFE_API_KEY`. `JEV_AUTH_MODE=proxy` sends **no auth header**: a cloud
   environment API credential makes Anthropic's agent proxy add

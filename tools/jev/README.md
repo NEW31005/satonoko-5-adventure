@@ -20,6 +20,8 @@ With no environment set, every entry point answers locally and opens no socket.
 | `JEV_AUTH_MODE` | `direct` (default) or `proxy` — see below |
 | `TYPESAFE_API_KEY` | required in `direct` mode only; value never logged or printed |
 | `JEV_MOCK_BASE_URL` | tests only; **must** be `http://127.0.0.1:<port>` |
+| `NODE_USE_ENV_PROXY=1` | **required for any real call** when `HTTPS_PROXY` is set — see below |
+| `JEV_MAX_RETRIES` | override retries (0..3, default 1); set `0` for a single-attempt run |
 | `JEV_LEDGER_PATH` | budget ledger; point several environments at one file to share a pot |
 | `JEV_CACHE_PATH`, `JEV_ALLOWLIST_PATH`, `JEV_TIMEOUT_MS`, `JEV_REPO_ROOT` | overrides |
 
@@ -74,6 +76,21 @@ allow them**, so this covers `api.typesafe.ai` on its own.
 
 `docs.typesafe.ai` is **not** on the credential and still needs a separate egress
 allowance if the skill's live-doc reads are wanted. It currently returns 403.
+
+### The agent proxy must be in the path
+
+Node's built-in `fetch` does **not** read `HTTPS_PROXY` unless `NODE_USE_ENV_PROXY=1`
+is set *before the process starts* (setting it from inside is too late — undici reads
+it at startup). Bypassing the agent proxy is not merely a connectivity problem: the
+proxy enforces the egress policy and, in `proxy` auth mode, is what attaches the
+credential. A request that skips it leaves outside policy and unauthenticated.
+
+`resolveMode` therefore **refuses** a real call when `HTTPS_PROXY` is set and
+`NODE_USE_ENV_PROXY` is not. Run real calls as:
+
+```sh
+NODE_USE_ENV_PROXY=1 node tools/jev/cli.mjs …
+```
 
 ## Commands
 
