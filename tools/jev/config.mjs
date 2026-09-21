@@ -90,8 +90,35 @@ const flag = (name) => TRUE.has(String(process.env[name] ?? '').trim().toLowerCa
  * Resolve the runtime mode. Default is OFF: with no environment set at all,
  * every entry point returns a local-only result and makes no network call.
  */
+/**
+ * Authentication modes.
+ *
+ *  direct  (default) -- we hold the key and send `x-api-key` ourselves, per the
+ *                       official SDK. Requires TYPESAFE_API_KEY in this process.
+ *  proxy             -- a Claude Code cloud-environment **API credential** holds
+ *                       the key. Anthropic's agent proxy attaches
+ *                       `Authorization: Bearer <key>` AFTER the request leaves the
+ *                       session VM, for the hosts listed on that credential. The
+ *                       value never reaches this process, its environment
+ *                       variables, or the agent. So in this mode we require NO
+ *                       key and MUST NOT send any auth header of our own --
+ *                       doing so would either leak a second credential or
+ *                       collide with the injected one.
+ *
+ * The endpoint is the same fixed official HTTPS URL in both modes.
+ */
+export const AUTH_MODES = new Set(['direct', 'proxy']);
+
+export const resolveAuthMode = (env = process.env) =>
+  String(env.JEV_AUTH_MODE ?? 'direct').trim().toLowerCase() || 'direct';
+
 export function resolveMode(env = process.env) {
   const enabled = TRUE.has(String(env.JEV_ENABLED ?? '').trim().toLowerCase());
+  const authMode = resolveAuthMode(env);
+  if (!AUTH_MODES.has(authMode)) {
+    return { kind: 'off', reason: `JEV_AUTH_MODE must be one of ${[...AUTH_MODES].join(', ')} (got '${authMode}')` };
+  }
+
   const mock = String(env.JEV_MOCK_BASE_URL ?? '').trim();
   if (mock) {
     // A mock base URL may only ever be loopback, so a misconfiguration cannot
@@ -100,16 +127,18 @@ export function resolveMode(env = process.env) {
       return { kind: 'off', reason: 'JEV_MOCK_BASE_URL must be http://127.0.0.1:<port>' };
     }
     if (!enabled) return { kind: 'off', reason: 'JEV_ENABLED is not set' };
-    return { kind: 'mock', endpoint: `${mock}/v1/systemone` };
+    return { kind: 'mock', endpoint: `${mock}/v1/systemone`, authMode };
   }
-  if (!enabled) return { kind: 'off', reason: 'JEV_ENABLED is not set (default OFF)' };
+
+  if (!enabled) return { kind: 'off', reason: 'JEV_ENABLED is not set (default OFF)', authMode };
   if (!TRUE.has(String(env.JEV_ALLOW_REAL_API ?? '').trim().toLowerCase())) {
-    return { kind: 'off', reason: 'JEV_ALLOW_REAL_API is not set (real API stays OFF)' };
+    return { kind: 'off', reason: 'JEV_ALLOW_REAL_API is not set (real API stays OFF)', authMode };
   }
-  if (!String(env.TYPESAFE_API_KEY ?? '').trim()) {
-    return { kind: 'off', reason: 'TYPESAFE_API_KEY is not present in this environment' };
+  // Only proxy mode is exempt from holding a key, because it never sends one.
+  if (authMode === 'direct' && !String(env.TYPESAFE_API_KEY ?? '').trim()) {
+    return { kind: 'off', reason: 'TYPESAFE_API_KEY is not present in this environment', authMode };
   }
-  return { kind: 'real', endpoint: OFFICIAL_ENDPOINT };
+  return { kind: 'real', endpoint: OFFICIAL_ENDPOINT, authMode };
 }
 
 export const repoRoot = () => process.env.JEV_REPO_ROOT || process.cwd();

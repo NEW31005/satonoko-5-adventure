@@ -522,3 +522,72 @@ describe('token accounting honesty', () => {
     assert.match(r.reason, /401/);
   });
 });
+
+describe('auth modes (direct vs proxy)', () => {
+  const AUTHY = ['authorization', 'x-api-key', 'api-key', 'proxy-authorization', 'x-typesafe-key'];
+
+  test('direct mode sends x-api-key and nothing else auth-shaped', async () => {
+    const mock = await mkMock([{}]);
+    const { env } = freshEnv({ JEV_MOCK_BASE_URL: mock.baseUrl, JEV_AUTH_MODE: 'direct' });
+    const r = await withEnv(env, () => systemOne({ state: 's', questions: CHOICE(['a', 'b']) }));
+    assert.equal(r.ok, true);
+    assert.equal(r.authMode, 'direct');
+    const h = mock.seen[0].headers;
+    assert.equal(h['x-api-key'], 'test-key-not-real');
+    assert.equal(h.authorization, undefined, 'direct mode must not also send Authorization');
+  });
+
+  test('proxy mode sends NO auth header at all, and still hits the official path', async () => {
+    const mock = await mkMock([{}]);
+    const { env } = freshEnv({ JEV_MOCK_BASE_URL: mock.baseUrl, JEV_AUTH_MODE: 'proxy' });
+    delete env.TYPESAFE_API_KEY; // proxy mode holds no key by design
+    const r = await withEnv(env, () => systemOne({ state: 's', questions: CHOICE(['a', 'b']) }));
+    assert.equal(r.ok, true);
+    assert.equal(r.authMode, 'proxy');
+    const h = mock.seen[0].headers;
+    for (const k of AUTHY) assert.equal(h[k], undefined, `proxy mode must not send ${k}`);
+    assert.equal(mock.seen[0].url, '/v1/systemone', 'endpoint path is unchanged');
+  });
+
+  test('CREDENTIAL LEAK GUARD: proxy mode withholds a key even when one is present', async () => {
+    // The whole point of the cloud API credential is that this process never
+    // holds the key. If one leaks into the environment anyway, we must still not
+    // transmit it -- the agent proxy is what authenticates the request.
+    const mock = await mkMock([{}]);
+    const { env } = freshEnv({ JEV_MOCK_BASE_URL: mock.baseUrl, JEV_AUTH_MODE: 'proxy' });
+    env.TYPESAFE_API_KEY = 'leaked-key-must-not-be-sent';
+    const r = await withEnv(env, () => systemOne({ state: 's', questions: CHOICE(['a', 'b']) }));
+    assert.equal(r.ok, true);
+    const raw = JSON.stringify(mock.seen[0]);
+    assert.ok(!raw.includes('leaked-key-must-not-be-sent'), 'the key must appear nowhere in the request');
+    for (const k of AUTHY) assert.equal(mock.seen[0].headers[k], undefined);
+  });
+
+  test('proxy mode drops the key requirement; direct mode keeps it', () => {
+    const base = { JEV_ENABLED: '1', JEV_ALLOW_REAL_API: '1' };
+    assert.equal(resolveMode({ ...base, JEV_AUTH_MODE: 'proxy' }).kind, 'real');
+    assert.equal(resolveMode({ ...base }).kind, 'off');
+    assert.match(resolveMode({ ...base }).reason, /TYPESAFE_API_KEY/);
+    assert.equal(resolveMode({ ...base, TYPESAFE_API_KEY: 'k' }).kind, 'real');
+  });
+
+  test('an unknown auth mode is refused, not silently treated as direct', () => {
+    const m = resolveMode({ JEV_ENABLED: '1', JEV_ALLOW_REAL_API: '1', JEV_AUTH_MODE: 'bearer-yolo' });
+    assert.equal(m.kind, 'off');
+    assert.match(m.reason, /JEV_AUTH_MODE must be one of/);
+  });
+
+  test('proxy mode is still OFF by default and still respects the budget', async () => {
+    // Removing the key requirement must not remove any other gate.
+    assert.equal(resolveMode({ JEV_AUTH_MODE: 'proxy' }).kind, 'off');
+    assert.equal(resolveMode({ JEV_ENABLED: '1', JEV_AUTH_MODE: 'proxy' }).kind, 'off');
+
+    const mock = await mkMock([{}]);
+    const { env } = freshEnv({ JEV_MOCK_BASE_URL: mock.baseUrl, JEV_AUTH_MODE: 'proxy' });
+    withEnv(env, () => { for (let i = 0; i < 20; i++) { const l = reserve({ tokens: 10 }); settle(l.leaseId, { input_tokens: 10, output_tokens: 0 }); } });
+    const r = await withEnv(env, () => systemOne({ state: 's', questions: CHOICE(['a', 'b']) }));
+    assert.equal(r.ok, false);
+    assert.match(r.reason, /budget refused/);
+    assert.equal(mock.requestCount(), 0);
+  });
+});

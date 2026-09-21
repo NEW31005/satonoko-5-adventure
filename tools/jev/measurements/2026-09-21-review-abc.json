@@ -1,7 +1,9 @@
 {
-  "generatedAt": "2026-09-21T17:23:47.526Z",
+  "generatedAt": "2026-09-21T17:31:04.164Z",
   "mode": "mock (loopback)",
   "accounting": {
+    "costBasis": "SIMULATED: every response came from a loopback mock replaying a fixture usage. No billed TypeSafe request has succeeded from this cloud environment.",
+    "scope": "bytes compare the INPUT for review-candidate extraction; see comparisons.reviewCompletion for the cost of actually finishing the review",
     "bytes": "MEASURED",
     "tokens": "MEASURED only via POST /v1/messages/count_tokens; otherwise a labelled estimate",
     "quota": "NOT observable from this environment; never reported",
@@ -12,8 +14,8 @@
     "input": {
       "base": "origin/main",
       "head": "HEAD",
-      "files": 19,
-      "rawDiffBytes": 113774
+      "files": 23,
+      "rawDiffBytes": 160055
     },
     "arms": {
       "A": {
@@ -23,19 +25,19 @@
             "bytes": 146
           },
           "stat": {
-            "bytes": 1073
+            "bytes": 1514
           },
           "body": {
-            "bytes": 113774
+            "bytes": 160055
           }
         },
-        "totalBytes": 114993,
-        "totalTokens": 35565,
+        "totalBytes": 161715,
+        "totalTokens": 50025,
         "tokensMeasured": false,
         "tokenMethod": "local estimate (character-class weighted)",
         "tokenNote": "no ANTHROPIC_API_KEY in this environment",
         "quotaNote": "account/plan quota consumption is not observable from this environment and is not reported",
-        "ms": 17,
+        "ms": 19,
         "quality": {
           "evidenceRetained": true,
           "missingEvidence": [],
@@ -56,25 +58,30 @@
             "bytes": 146
           },
           "helperJson": {
-            "bytes": 45380
+            "bytes": 53102
+          },
+          "followupReads": {
+            "bytes": 4050
           }
         },
-        "totalBytes": 45526,
-        "totalTokens": 14279,
+        "totalBytes": 57298,
+        "totalTokens": 17964,
         "tokensMeasured": false,
         "tokenMethod": "local estimate (character-class weighted)",
         "tokenNote": "no ANTHROPIC_API_KEY in this environment",
         "quotaNote": "account/plan quota consumption is not observable from this environment and is not reported",
-        "ms": 88,
+        "ms": 73,
         "digestOnly": {
-          "totalBytes": 45526,
-          "totalTokens": 14279
+          "totalBytes": 53248,
+          "totalTokens": 16708
         },
         "followupReads": {
-          "files": 0,
-          "bytes": 0,
+          "files": 1,
+          "bytes": 4050,
           "note": "high-risk files the digest did not read in full"
         },
+        "completionBytes": 154234,
+        "filesLeftUnread": 19,
         "quality": {
           "evidenceRetained": true,
           "missingEvidence": [],
@@ -88,7 +95,9 @@
           "fallback": true
         },
         "jevCalls": 0,
-        "jevCostUsd": 0
+        "jevCostUsdSimulated": 0,
+        "jevCostUsdReal": 0,
+        "costBasis": "none (no call)"
       },
       "C": {
         "label": "Jev preprocessing",
@@ -97,25 +106,30 @@
             "bytes": 146
           },
           "helperJson": {
-            "bytes": 45123
+            "bytes": 53484
+          },
+          "followupReads": {
+            "bytes": 12056
           }
         },
-        "totalBytes": 45269,
-        "totalTokens": 14174,
+        "totalBytes": 65686,
+        "totalTokens": 20572,
         "tokensMeasured": false,
         "tokenMethod": "local estimate (character-class weighted)",
         "tokenNote": "no ANTHROPIC_API_KEY in this environment",
         "quotaNote": "account/plan quota consumption is not observable from this environment and is not reported",
-        "ms": 84,
+        "ms": 83,
         "digestOnly": {
-          "totalBytes": 45269,
-          "totalTokens": 14174
+          "totalBytes": 53630,
+          "totalTokens": 16829
         },
         "followupReads": {
-          "files": 0,
-          "bytes": 0,
+          "files": 2,
+          "bytes": 12056,
           "note": "high-risk files the digest did not read in full"
         },
+        "completionBytes": 151982,
+        "filesLeftUnread": 19,
         "quality": {
           "evidenceRetained": true,
           "missingEvidence": [],
@@ -138,8 +152,10 @@
           }
         },
         "jevCalls": 1,
-        "jevCostUsd": 0.000080598,
-        "jevLatencyNote": "helper wall time 84ms (includes the Jev round trip when one happened)"
+        "jevCostUsdSimulated": 0.000080598,
+        "jevCostUsdReal": null,
+        "costBasis": "simulated (loopback mock replaying a fixture usage)",
+        "jevLatencyNote": "helper wall time 83ms (includes the loopback mock round trip when one happened)"
       },
       "cache": {
         "label": "Jev preprocessing, cache reuse",
@@ -148,25 +164,30 @@
             "bytes": 146
           },
           "helperJson": {
-            "bytes": 44940
+            "bytes": 53301
+          },
+          "followupReads": {
+            "bytes": 12056
           }
         },
-        "totalBytes": 45086,
-        "totalTokens": 14117,
+        "totalBytes": 65503,
+        "totalTokens": 20515,
         "tokensMeasured": false,
         "tokenMethod": "local estimate (character-class weighted)",
         "tokenNote": "no ANTHROPIC_API_KEY in this environment",
         "quotaNote": "account/plan quota consumption is not observable from this environment and is not reported",
-        "ms": 57,
+        "ms": 54,
         "digestOnly": {
-          "totalBytes": 45086,
-          "totalTokens": 14117
+          "totalBytes": 53447,
+          "totalTokens": 16772
         },
         "followupReads": {
-          "files": 0,
-          "bytes": 0,
+          "files": 2,
+          "bytes": 12056,
           "note": "high-risk files the digest did not read in full"
         },
+        "completionBytes": 151799,
+        "filesLeftUnread": 19,
         "quality": {
           "evidenceRetained": true,
           "missingEvidence": [],
@@ -180,7 +201,30 @@
           "cache": "hit"
         },
         "jevCalls": 0,
-        "jevCostUsd": 0
+        "jevCostUsdSimulated": 0,
+        "jevCostUsdReal": null,
+        "costBasis": "simulated (loopback mock replaying a fixture usage)"
+      }
+    },
+    "comparisons": {
+      "extractionInput": {
+        "note": "input for review-candidate extraction only, NOT a completed review",
+        "B_savedVsA_pctOfA": 64.57,
+        "C_savedVsA_pctOfA": 59.38,
+        "cache_savedVsA_pctOfA": 59.49,
+        "C_vs_B_bytes": -8388,
+        "C_vs_B_pctOfB": -14.64,
+        "C_vs_B_percentagePointsOfA": -5.19,
+        "denominatorWarning": "C_vs_B_pctOfB uses B as the denominator; C_vs_B_percentagePointsOfA is a difference of two A-based percentages. They are not interchangeable."
+      },
+      "reviewCompletion": {
+        "note": "to COMPLETE the review every changed file must be read. Files the helper skipped are not reviewed, so the extraction saving above is not a completed-review quota saving.",
+        "A_bytes": 161715,
+        "B_completionBytes": 154234,
+        "C_completionBytes": 151982,
+        "B_savedVsA_pctOfA": 4.63,
+        "C_savedVsA_pctOfA": 6.02,
+        "filesLeftUnread": 19
       }
     }
   },
@@ -224,9 +268,10 @@
         "tokenMethod": "local estimate (character-class weighted)",
         "tokenNote": "no ANTHROPIC_API_KEY in this environment",
         "quotaNote": "account/plan quota consumption is not observable from this environment and is not reported",
-        "ms": 17,
+        "ms": 14,
         "jevCalls": 0,
         "jevReason": "1 unpinned group(s) (< 8): ranked locally, no Jev call",
+        "costBasis": "simulated (loopback mock)",
         "quality": {
           "evidenceRetained": true,
           "missingEvidence": []

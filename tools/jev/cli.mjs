@@ -52,6 +52,10 @@ async function main() {
       command: 'status',
       mode: mode.kind,
       modeReason: mode.reason ?? null,
+      authMode: mode.authMode ?? null,
+      authNote: mode.authMode === 'proxy'
+        ? 'proxy: this process holds and sends NO key; the cloud environment API credential makes the agent proxy add Authorization: Bearer after the request leaves the VM'
+        : 'direct: this process sends x-api-key and therefore needs TYPESAFE_API_KEY',
       endpoint: mode.kind === 'real' ? OFFICIAL_ENDPOINT : (mode.endpoint ?? `${OFFICIAL_ENDPOINT} (not contacted)`),
       modelPin: MODEL_PIN,
       apiKeyPresent: Boolean(String(process.env.TYPESAFE_API_KEY ?? '').trim()),

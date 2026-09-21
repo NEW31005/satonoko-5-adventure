@@ -17,13 +17,57 @@ With no environment set, every entry point answers locally and opens no socket.
 | --- | --- |
 | `JEV_ENABLED=1` | master switch; without it everything is local |
 | `JEV_ALLOW_REAL_API=1` | additionally required before the real endpoint is contacted |
-| `TYPESAFE_API_KEY` | required for the real endpoint; value never logged or printed |
+| `JEV_AUTH_MODE` | `direct` (default) or `proxy` — see below |
+| `TYPESAFE_API_KEY` | required in `direct` mode only; value never logged or printed |
 | `JEV_MOCK_BASE_URL` | tests only; **must** be `http://127.0.0.1:<port>` |
 | `JEV_LEDGER_PATH` | budget ledger; point several environments at one file to share a pot |
 | `JEV_CACHE_PATH`, `JEV_ALLOWLIST_PATH`, `JEV_TIMEOUT_MS`, `JEV_REPO_ROOT` | overrides |
 
 The real API is currently **off in this cloud environment on purpose**, and could not
 be reached anyway: the egress policy returns 403 for `api.typesafe.ai`.
+
+## Authentication modes
+
+| Mode | Who holds the key | What we send | Needs `TYPESAFE_API_KEY` |
+| --- | --- | --- | --- |
+| `direct` (default) | this process | `x-api-key`, per the official SDK | **yes** |
+| `proxy` | the cloud environment | **nothing** | **no** |
+
+In `proxy` mode a Claude Code cloud-environment **API credential** holds the key.
+Anthropic's agent proxy attaches `Authorization: Bearer <key>` *after the request
+has left the session VM*, so the value never reaches this process, its environment
+variables, the commands it runs, or the agent. We therefore send **no auth header at
+all** — a test asserts that proxy mode withholds a key even when one is present in
+the environment, because sending one would leak a credential we are not supposed to
+hold.
+
+`proxy` removes only the key requirement. Default-OFF, `JEV_ALLOW_REAL_API`, the
+budget caps, the allowlist and every other gate apply unchanged, and the endpoint is
+the same fixed official HTTPS URL.
+
+### Cloud environment setup (values are registered by the account owner, never here)
+
+Prepared for registration at [claude.ai/code](https://claude.ai/code) → edit the
+**Default** environment → **API credentials** → **Add credential**:
+
+| Field | Value |
+| --- | --- |
+| Credential type | `Bearer` (the default) |
+| Name | `TypeSafe Jev (api.typesafe.ai)` |
+| Allowed websites | `api.typesafe.ai` — exactly this host, no `*.` wildcard |
+| Custom header → Name | `Authorization` |
+| Custom header → Prefix | `Bearer` |
+| Custom header → Value | the TypeSafe API key — **pasted by the account owner, never by Claude and never in this repository** |
+
+Notes from the official docs: API credentials need an organization admin role and a
+Pro or Max plan; the environment must already exist (the new-environment dialog does
+not offer them); there is no edit, so changing hosts or value means delete and re-add;
+the value cannot be viewed again after saving. A credential's allowed hosts are
+reachable **even when the environment's network access level would not otherwise
+allow them**, so this covers `api.typesafe.ai` on its own.
+
+`docs.typesafe.ai` is **not** on the credential and still needs a separate egress
+allowance if the skill's live-doc reads are wanted. It currently returns 403.
 
 ## Commands
 
@@ -155,17 +199,31 @@ Three quantities are kept apart and never conflated:
 level. Without `ANTHROPIC_API_KEY` every token figure carries `tokensMeasured:
 false` and names the estimator.
 
-### Result on PR #1 (`tools/jev/measurements/`)
+### Results (`tools/jev/measurements/`, 23 files, 160,055 B raw diff)
 
-| Arm | Total bytes | Est. tokens | Jev calls | Cost | Evidence kept |
-| --- | --- | --- | --- | --- | --- |
-| A plain diff | 114,993 | ~35,565 | 0 | $0 | yes |
-| B local only | 45,526 | ~14,279 | 0 | $0 | yes |
-| C Jev | 45,269 | ~14,174 | 1 | $0.000080598 | yes |
-| cache | 45,086 | ~14,117 | 0 | $0 | yes |
+**Cost basis: SIMULATED.** Every response came from a loopback mock replaying a
+fixture `usage`. No billed TypeSafe request has ever succeeded from this cloud
+environment, so no figure here is money spent.
 
-**Where the saving does NOT come from Jev.** B already captures 60.4% of the
-reduction; C adds 0.2% (257 bytes) for a real request. On a 702-line build log the
-helper cut 94.1% with **zero** Jev calls — local dedupe did all of it. Jev earns its
-call only when many genuinely distinct semantic candidates remain after local
-narrowing; on these two inputs it mostly did not.
+| Arm | Extraction input | Est. tokens | Completion input | Files left unread | Jev calls | Cost |
+| --- | --- | --- | --- | --- | --- | --- |
+| A plain diff | 161,715 | ~50,025 | — | 0 | 0 | — |
+| B local only | 57,298 | ~17,964 | 154,234 | 19 | 0 | — |
+| C Jev | 65,686 | ~20,572 | 151,982 | 19 | 1 | simulated $0.000080598 |
+| cache | 65,503 | ~20,515 | 151,799 | 19 | 0 | — |
+
+**Two scopes, and they are not interchangeable.**
+
+*Extraction input* is what it costs to decide what to read. B saves 64.57% of A;
+C saves 59.38% of A. **C is 8,388 bytes LARGER than B** — that is −14.64% measured
+against B, and −5.19 percentage points measured against A. Those two numbers
+describe the same 8,388 bytes against different denominators.
+
+*Review completion* is what it costs to actually finish, because the 19 files the
+helper skipped still have to be read. There B saves **4.63%** and C **6.02%** of A.
+A ~60% extraction saving is not a ~60% saving on a completed review.
+
+**Where Jev does not pay.** On this diff the Jev call made the extraction input
+*worse*: it promoted a larger file into the read budget, so C cost more input than
+local ordering alone for a simulated $0.000080598. On a 702-line build log the helper
+cut 94.1% with **zero** Jev calls — local dedupe did all of it. Recorded as measured.

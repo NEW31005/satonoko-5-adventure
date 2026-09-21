@@ -1,8 +1,11 @@
 // Guarded HTTP client for POST /v1/systemone.
 //
-// Auth follows the official @typesafe-ai/sdk 0.6.0 build, which sends `x-api-key`.
-// (An `Authorization: Bearer` form is also accepted by the service, per the Codex
-// side's real-API check; we implement the SDK's form.)
+// Two authentication modes, chosen by JEV_AUTH_MODE (see config.mjs):
+//   direct (default) -- we send `x-api-key`, per the official @typesafe-ai/sdk build.
+//   proxy            -- we send NOTHING; a Claude Code cloud-environment API
+//                       credential makes the agent proxy add `Authorization:
+//                       Bearer <key>` after the request leaves the VM.
+// The endpoint is the same fixed official HTTPS URL either way.
 //
 // Every failure path is explicit:
 //   401 / 403 / missing key / budget refused -> zero retries, local fallback
@@ -120,13 +123,21 @@ export async function systemOne({ state, questions, env = process.env, fetchImpl
     let settled = false;
 
     try {
+      const headers = {
+        'content-type': 'application/json',
+        'user-agent': 'satonoko-jev-preprocess/1 (local guard rails)',
+      };
+      if (mode.authMode === 'direct') {
+        headers['x-api-key'] = String(env.TYPESAFE_API_KEY ?? '');
+      }
+      // proxy mode: send NO auth header. The cloud environment's API credential
+      // is attached by Anthropic's agent proxy once the request has left the VM.
+      // Never read TYPESAFE_API_KEY here -- in this mode we are not supposed to
+      // have it, and sending one anyway would leak a credential we should not hold.
+
       const res = await fetchImpl(mode.endpoint, {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': String(env.TYPESAFE_API_KEY ?? ''),
-          'user-agent': 'satonoko-jev-preprocess/1 (local guard rails)',
-        },
+        headers,
         body,
         signal: controller.signal,
       });
@@ -171,7 +182,7 @@ export async function systemOne({ state, questions, env = process.env, fetchImpl
       return {
         ok: true, accepted, rejected, resolvedModel: parsed.model,
         usage: parsed.usage, settlement, requestBytes: Buffer.byteLength(body), responseBytes: text.length,
-        attempts: attemptsLog.length, attemptsLog, mode: mode.kind,
+        attempts: attemptsLog.length, attemptsLog, mode: mode.kind, authMode: mode.authMode,
       };
     } catch (e) {
       const aborted = e?.name === 'AbortError';

@@ -84,6 +84,7 @@ async function benchLog(env, { log = syntheticLog(), label = 'B: large log (repe
       calls: digest.attempts ?? 0,
       jevInputTokens: digest.usage?.input_tokens ?? 0,
       jevCostUsd: Number((((digest.usage?.input_tokens ?? 0) / 1e6) * PRICING.inputUsdPerMTok).toFixed(9)),
+      costBasis: useMock ? 'SIMULATED (loopback mock fixture usage) -- not money spent' : 'real',
       ms,
     },
     contextBytesAvoided: baselineBytes - digestBytes,
